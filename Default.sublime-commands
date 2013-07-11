@@ -1,0 +1,7 @@
+[
+    {
+        "id": "resterhttprequest",
+        "caption": "RESTer: HTTP Request",
+        "command": "rester_http_request"
+    }
+]

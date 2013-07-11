@@ -1,0 +1,14 @@
+{
+    "default_response_encodings": ["utf-8", "ISO-8859-1"],
+    "response_body_commands": [
+        {
+            "content-type": [
+                "application/json",
+                "text/json"
+            ],
+            "commands": [
+                "prettyjson"
+            ]
+        }
+    ]
+}
