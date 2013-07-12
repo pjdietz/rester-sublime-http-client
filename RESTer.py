@@ -1,4 +1,5 @@
 import http.client
+import gzip
 import re
 import threading
 from urllib.parse import urlparse
@@ -136,6 +137,13 @@ class ResterHttpRequestCommand(sublime_plugin.TextCommand):
         # Decode the body from a list of bytes
         body_bytes = response.read()
         
+        # Unzip if needed.
+        content_encoding = response.getheader("content-encoding")
+        if content_encoding:
+            content_encoding = content_encoding.lower()
+            if "gzip" in content_encoding:
+                body_bytes = gzip.decompress(body_bytes)
+
         # Decode the body. The hard part here is finding the right encoding.
         # To do this, create a list of possible matches.
         encodings = []
@@ -171,15 +179,21 @@ class ResterHttpRequestCommand(sublime_plugin.TextCommand):
         if eol != "\n":
             body = body.replace("\n", eol)
 
-        # TODO deflate, unzip if needed.
-
         # Insert the response and select the body.
-        view.run_command("insert_response", {
-            "status_line": status_line,
-            "headers": headers,
-            "body": body,
-            "eol": eol
-        })
+        if settings.get("body_only") and 200 <= response.status <= 299: 
+            # Output the body only, but only on success.
+            view.run_command("insert_response", {
+                "body": body,
+                "eol": eol
+            })
+        else:
+            # Output status, headers, and body.
+            view.run_command("insert_response", {
+                "status_line": status_line,
+                "headers": headers,
+                "body": body,
+                "eol": eol
+            })
 
         # Read the content-type header, if present.
         actual_content_type = response.getheader("content-type")
@@ -251,7 +265,7 @@ class HttpRequestThread(threading.Thread):
         self._query = None
         self._method = "GET"
         self._header_lines = []
-        self._headers = {}
+        self._headers = settings.get("default_headers", {})
         self._body = None
 
         # Parse the string to fill in the members with actual values.
@@ -350,7 +364,8 @@ class HttpRequestThread(threading.Thread):
             if ":" in header:
                 (key, value) = header.split(":", 1)
                 headers[key] = value.strip()
-        self._headers = headers
+        self._headers = dict(list(self._headers.items()) + 
+                            list(headers.items()))
 
     def _read_request_line_dict(self, line):
         """Return a dicionary containing information about the request."""

@@ -1,5 +1,17 @@
 {
+    // Do not output headers on success.
+    "body_only": false,
+
+    // Default headers to add for each request.
+    "default_headers": {
+        "Accept-Encoding": "gzip",
+        "Cache-control": "no-cache"
+    },
+
+    // List of encodings to try if not discernable from the response.
     "default_response_encodings": ["utf-8", "ISO-8859-1"],
+
+    // Commands to run on the body, based on content-type
     "response_body_commands": [
         {
             "content-type": [
