@@ -1,6 +1,7 @@
 import http.client
 import gzip
 import re
+import socket
 import threading
 from urllib.parse import urlparse
 
@@ -81,21 +82,8 @@ class ResterHttpRequestCommand(sublime_plugin.TextCommand):
 
     def _handle_thread(self, thread, i=0, dir=1):
         
-        running = None
-
         if thread.is_alive():
-            # Still running. Store this and run recursively.
-            running = thread
-        elif thread.result == False:
-            # Failed.
-            return
-        else:
-            # Success.
-            result = thread.result
-            self._complete_thread(result)
-
-        if running:
-            # This animates a little activity indicator in the status area
+            # This animates a little activity indicator in the status area.
             before = i % 8
             after = (7) - before
             if not after:
@@ -103,14 +91,23 @@ class ResterHttpRequestCommand(sublime_plugin.TextCommand):
             if not before:
                 dir = 1
             i += dir
-            self.view.set_status('rester', 'RESTer [%s=%s]' % 
-                    (' ' * before, ' ' * after))
-            sublime.set_timeout(lambda: self._handle_thread(running, i, dir), 
-                                                            100)
-            return
-
-        self.view.erase_status("rester")
-        sublime.status_message("RESTer Request Complete")
+            message = "RESTer [%s=%s]" %(" " * before, " " * after)
+            self.view.set_status("rester", message)
+            sublime.set_timeout(
+                    lambda: self._handle_thread(thread, i, dir), 100)
+        elif isinstance(thread.result, http.client.HTTPResponse):
+            # Success.
+            self._complete_thread(thread.result)
+            self.view.erase_status("rester")
+            sublime.status_message("RESTer Request Complete")
+        elif isinstance(thread.result, str):
+            # Failed.
+            self.view.erase_status("rester")
+            sublime.status_message(thread.result)
+        else:
+            # Failed.
+            self.view.erase_status("rester")
+            sublime.status_message("Unable to make request.")
 
     def _complete_thread(self, response):
         
@@ -136,7 +133,7 @@ class ResterHttpRequestCommand(sublime_plugin.TextCommand):
 
         # Decode the body from a list of bytes
         body_bytes = response.read()
-        
+
         # Unzip if needed.
         content_encoding = response.getheader("content-encoding")
         if content_encoding:
@@ -257,6 +254,8 @@ class HttpRequestThread(threading.Thread):
     def __init__(self, string, eol="\n"):
         """Create a new request object"""
 
+        threading.Thread.__init__(self)  
+
         # Store members and set defaults.
         self._eol = eol
         self._scheme = "http"
@@ -270,17 +269,31 @@ class HttpRequestThread(threading.Thread):
 
         # Parse the string to fill in the members with actual values.
         self._parse_string(string)
-
-        threading.Thread.__init__(self)  
-
+    
     def run(self):
         """Method to run when the thread is started."""
+
+        # Fail if the hostname is not set.
+        if not self._hostname:
+            self.result = "Unable to make request: Please provide a hostname."
+            return
+
+        # Create the connection.
         conn = http.client.HTTPConnection(self._hostname)
+
         uri = self._path
         if self._query:
             uri += "?" + self._query
-        conn.request(self._method, uri, headers=self._headers, body=self._body)
+        try:
+            conn.request(self._method, uri, headers=self._headers, body=self._body)
+        except socket.gaierror:
+            self.result = "Unable to make request. Make sure the hostname is valid."
+            conn.close()
+            return
+
+        # Read the response.
         resp = conn.getresponse()
+        conn.close()
         self.result = resp
 
     def _normalize_line_endings(self, string):  
@@ -329,13 +342,14 @@ class HttpRequestThread(threading.Thread):
                 if key.lower() == "host":
                     self._hostname = self._headers[key]
 
-        # TODO Fail if no hostname is set.
-
     def _parse_request_line(self, line):
         """Parse the first line of the request"""
 
         # Parse the first line as the request line.
+        # Fail, if unable to parse.
         request_line = self._read_request_line_dict(line)
+        if not request_line:
+            return
 
         # Parse the URI.
         uri = urlparse(request_line["uri"])
