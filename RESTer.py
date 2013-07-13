@@ -281,20 +281,53 @@ class HttpRequestThread(threading.Thread):
         # Create the connection.
         conn = http.client.HTTPConnection(self._hostname)
 
-        uri = self._path
-        if self._query:
-            uri += "?" + self._query
         try:
-            conn.request(self._method, uri, headers=self._headers, body=self._body)
+            conn.request(self._method, 
+                         self._get_requet_uri(), 
+                         headers=self._headers, 
+                         body=self._body)
         except socket.gaierror:
             self.result = "Unable to make request. Make sure the hostname is valid."
             conn.close()
             return
 
+        # Output the request to the console.
+        if settings.get("output_request", True):
+            print(self._get_request_as_string())
+
         # Read the response.
         resp = conn.getresponse()
         conn.close()
         self.result = resp
+
+    def _get_requet_uri(self):
+        """Return the path + query string for the request."""
+        uri = self._path
+        if self._query:
+            uri += "?" + self._query
+        return uri
+
+    def _get_request_as_string(self):
+        """Return a string representation of the request."""
+
+        lines = []
+
+        # TODO Allow for HTTPS
+        protocol = "HTTP/1.1"
+
+        lines.append("%s %s %s" %(self._method, 
+                                  self._get_requet_uri(), 
+                                  protocol))
+
+        for key in self._headers:
+            lines.append("%s: %s" %(key, self._headers[key]))
+
+        string = self._eol.join(lines)
+
+        if self._body:
+            string += self._eol + self._body
+
+        return string
 
     def _normalize_line_endings(self, string):  
         """Return a string with consistent line endings."""
@@ -336,11 +369,19 @@ class HttpRequestThread(threading.Thread):
         # Make a dictionary of headers.
         self._parse_header_lines()
 
-        # Check if the Host was supplied in a header.
-        if not self._hostname:
-            for key in self._headers:
-                if key.lower() == "host":
+        # Check if a Host header was supplied.
+        has_host_header = False
+        for key in self._headers:
+            if key.lower() == "host":
+                has_host_header = True 
+                # If self._hostname is not yet set, read it from the header.
+                if not self._hostname:
                     self._hostname = self._headers[key]
+                break
+                    
+        # Add a host header, if not explicitly set.
+        if not has_host_header and self._hostname:
+            self._headers["Host"] = self._hostname
 
     def _parse_request_line(self, line):
         """Parse the first line of the request"""
@@ -378,8 +419,10 @@ class HttpRequestThread(threading.Thread):
             if ":" in header:
                 (key, value) = header.split(":", 1)
                 headers[key] = value.strip()
-        self._headers = dict(list(self._headers.items()) + 
-                            list(headers.items()))
+
+        if headers and self._headers:
+            self._headers = dict(list(self._headers.items()) + 
+                                list(headers.items()))
 
     def _read_request_line_dict(self, line):
         """Return a dicionary containing information about the request."""

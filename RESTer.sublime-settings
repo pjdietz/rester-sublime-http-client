@@ -11,6 +11,9 @@
     // List of encodings to try if not discernable from the response.
     "default_response_encodings": ["utf-8", "ISO-8859-1"],
 
+    // Output the request to the console.
+    "output_request": true,
+
     // Commands to run on the body, based on content-type
     "response_body_commands": [
         {
