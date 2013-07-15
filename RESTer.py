@@ -264,7 +264,9 @@ class HttpRequestThread(threading.Thread):
         self._query = None
         self._method = "GET"
         self._header_lines = []
-        self._headers = settings.get("default_headers", {})
+        self._headers = settings.get("default_headers")
+        if not isinstance(self._headers, dict):
+            self._headers = {}
         self._body = None
 
         # Parse the string to fill in the members with actual values.
@@ -378,7 +380,7 @@ class HttpRequestThread(threading.Thread):
                 if not self._hostname:
                     self._hostname = self._headers[key]
                 break
-                    
+                
         # Add a host header, if not explicitly set.
         if not has_host_header and self._hostname:
             self._headers["Host"] = self._hostname
