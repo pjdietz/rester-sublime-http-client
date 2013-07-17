@@ -45,7 +45,7 @@ class InsertResponseCommand(sublime_plugin.TextCommand):
     """Output a response to a new file.
 
     This TextCommand is for internal use and not intended for end users.
-    
+
     """
 
     def run(self, edit, status_line="", headers="", body="", eol="\n"):
@@ -81,7 +81,7 @@ class ResterHttpRequestCommand(sublime_plugin.TextCommand):
         self._handle_thread(thread)
 
     def _handle_thread(self, thread, i=0, dir=1):
-        
+
         if thread.is_alive():
             # This animates a little activity indicator in the status area.
             before = i % 8
@@ -110,9 +110,9 @@ class ResterHttpRequestCommand(sublime_plugin.TextCommand):
             sublime.status_message("Unable to make request.")
 
     def _complete_thread(self, response):
-        
+
         # Create a new file.
-        view = self.view.window().new_file() 
+        view = self.view.window().new_file()
 
         eol = self._get_end_of_line_character()
 
@@ -122,7 +122,7 @@ class ResterHttpRequestCommand(sublime_plugin.TextCommand):
             version = "1.1"
         else:
             version = "1.0"
-        status_line = "%s/%s %d %s" %(protocol, version, response.status, 
+        status_line = "%s/%s %d %s" %(protocol, version, response.status,
                                      response.reason)
 
         # Build the headers
@@ -144,7 +144,7 @@ class ResterHttpRequestCommand(sublime_plugin.TextCommand):
         # Decode the body. The hard part here is finding the right encoding.
         # To do this, create a list of possible matches.
         encodings = []
-        
+
         # Check the content-type header, if present.
         content_type = response.getheader("content-type")
         if content_type:
@@ -158,12 +158,12 @@ class ResterHttpRequestCommand(sublime_plugin.TextCommand):
             encodings.append(encoding)
 
         # Add any default encodings not already discovered.
-        default_encodings = settings.get("default_response_encodings")
+        default_encodings = settings.get("default_response_encodings", [])
         for encoding in default_encodings:
             if encoding not in encodings:
                 encodings.append(encoding)
 
-        # Decoding using the encodings discovered.        
+        # Decoding using the encodings discovered.
         body = decode(body_bytes, encodings)
         if body is None:
             print("ERROR!")
@@ -171,13 +171,13 @@ class ResterHttpRequestCommand(sublime_plugin.TextCommand):
             # TODO: Show error message.
 
         # Normalize the line endings
-        body = body.replace("\r\n", "\n").replace("\r", "\n")  
+        body = body.replace("\r\n", "\n").replace("\r", "\n")
         eol = self._get_end_of_line_character()
         if eol != "\n":
             body = body.replace("\n", eol)
 
         # Insert the response and select the body.
-        if settings.get("body_only") and 200 <= response.status <= 299: 
+        if settings.get("body_only") and 200 <= response.status <= 299:
             # Output the body only, but only on success.
             view.run_command("insert_response", {
                 "body": body,
@@ -211,10 +211,10 @@ class ResterHttpRequestCommand(sublime_plugin.TextCommand):
                     test_content_type = command["content-type"]
                     if isinstance(test_content_type, str):
                         run = actual_content_type == test_content_type.lower()
-                    # Check iterable for stringness of all items. 
+                    # Check iterable for stringness of all items.
                     # Will raise TypeError if some_object is not iterable
                     elif all(isinstance(item, str) for item \
-                                                    in test_content_type): 
+                                                    in test_content_type):
                         run = actual_content_type in [content_type.lower() \
                                 for content_type in test_content_type]
                     else:
@@ -239,10 +239,10 @@ class ResterHttpRequestCommand(sublime_plugin.TextCommand):
 
     def _get_end_of_line_character(self):
         """Return the EOL character from the view's settings."""
-        line_endings = self.view.settings().get("default_line_ending")  
+        line_endings = self.view.settings().get("default_line_ending")
         if line_endings == "windows":
-            return "\r\n" 
-        elif line_endings == "mac":  
+            return "\r\n"
+        elif line_endings == "mac":
             return "\r"
         else:
             return "\n"
@@ -254,7 +254,7 @@ class HttpRequestThread(threading.Thread):
     def __init__(self, string, eol="\n"):
         """Create a new request object"""
 
-        threading.Thread.__init__(self)  
+        threading.Thread.__init__(self)
 
         # Store members and set defaults.
         self._eol = eol
@@ -271,7 +271,7 @@ class HttpRequestThread(threading.Thread):
 
         # Parse the string to fill in the members with actual values.
         self._parse_string(string)
-    
+
     def run(self):
         """Method to run when the thread is started."""
 
@@ -284,9 +284,9 @@ class HttpRequestThread(threading.Thread):
         conn = http.client.HTTPConnection(self._hostname)
 
         try:
-            conn.request(self._method, 
-                         self._get_requet_uri(), 
-                         headers=self._headers, 
+            conn.request(self._method,
+                         self._get_requet_uri(),
+                         headers=self._headers,
                          body=self._body)
         except socket.gaierror:
             self.result = "Unable to make request. Make sure the hostname is valid."
@@ -317,8 +317,8 @@ class HttpRequestThread(threading.Thread):
         # TODO Allow for HTTPS
         protocol = "HTTP/1.1"
 
-        lines.append("%s %s %s" %(self._method, 
-                                  self._get_requet_uri(), 
+        lines.append("%s %s %s" %(self._method,
+                                  self._get_requet_uri(),
                                   protocol))
 
         for key in self._headers:
@@ -331,9 +331,9 @@ class HttpRequestThread(threading.Thread):
 
         return string
 
-    def _normalize_line_endings(self, string):  
+    def _normalize_line_endings(self, string):
         """Return a string with consistent line endings."""
-        string = string.replace("\r\n", "\n").replace("\r", "\n")  
+        string = string.replace("\r\n", "\n").replace("\r", "\n")
         if self._eol != "\n":
             string = string.replace("\n", self._eol)
         return string
@@ -361,7 +361,7 @@ class HttpRequestThread(threading.Thread):
             if lines[i] == "":
                 has_body = True
                 break
-        
+
         if has_body:
             self._header_lines = lines[1:i]
             self._body = self._eol.join(lines[i+1:])
@@ -375,12 +375,12 @@ class HttpRequestThread(threading.Thread):
         has_host_header = False
         for key in self._headers:
             if key.lower() == "host":
-                has_host_header = True 
+                has_host_header = True
                 # If self._hostname is not yet set, read it from the header.
                 if not self._hostname:
                     self._hostname = self._headers[key]
                 break
-                
+
         # Add a host header, if not explicitly set.
         if not has_host_header and self._hostname:
             self._headers["Host"] = self._hostname
@@ -423,7 +423,7 @@ class HttpRequestThread(threading.Thread):
                 headers[key] = value.strip()
 
         if headers and self._headers:
-            self._headers = dict(list(self._headers.items()) + 
+            self._headers = dict(list(self._headers.items()) +
                                 list(headers.items()))
 
     def _read_request_line_dict(self, line):

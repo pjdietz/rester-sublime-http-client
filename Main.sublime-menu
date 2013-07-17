@@ -1,31 +1,31 @@
 [
     {
-        "mnemonic": "n", 
-        "caption": "Preferences", 
-        "id": "preferences", 
+        "mnemonic": "n",
+        "caption": "Preferences",
+        "id": "preferences",
         "children": [
             {
-                "mnemonic": "P", 
-                "caption": "Package Settings", 
-                "id": "package-settings", 
+                "mnemonic": "P",
+                "caption": "Package Settings",
+                "id": "package-settings",
                 "children": [
                     {
-                        "caption": "RESTer HTTP Client", 
+                        "caption": "RESTer HTTP Client",
                         "children": [
                             {
-                                "caption": "Settings – Default", 
+                                "caption": "Settings – Default",
                                 "args": {
-                                    "file": "${packages}/RESTer/RESTer.sublime-settings"
-                                }, 
+                                    "file": "${packages}/rester-sublime-http-client/RESTer.sublime-settings"
+                                },
                                 "command": "open_file"
-                            }, 
+                            },
                             {
-                                "caption": "Settings – User", 
+                                "caption": "Settings – User",
                                 "args": {
                                     "file": "${packages}/User/RESTer.sublime-settings"
-                                }, 
+                                },
                                 "command": "open_file"
-                            }, 
+                            },
                             {
                                 "caption": "-"
                             }
