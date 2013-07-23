@@ -22,17 +22,7 @@
                 "text/json"
             ],
             "commands": [
-                "indent_json"
-                //"prettyjson"
-            ]
-        },
-        {
-            "content-type": [
-                "text/xml",
-                "application/xml"
-            ],
-            "commands": [
-                "indent_xml"
+                "prettyjson"
             ]
         }
     ]
