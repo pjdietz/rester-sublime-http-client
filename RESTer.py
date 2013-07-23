@@ -9,13 +9,19 @@ import sublime
 import sublime_plugin
 
 
+RE_METHOD = """(?P<method>[A-Z]+)"""
+RE_URI = """(?P<uri>[a-zA-Z0-9\-\/\.\_\:\?\#\[\]\@\!\$\&\=]+)"""
+RE_PROTOCOL = """(?P<protocol>.*)"""
+RE_ENCODING = """(?:encoding|charset)=['"]*([a-zA-Z0-9\-]+)['"]*"""
+
+
 # Read the settings.
 settings = sublime.load_settings("RESTer.sublime-settings")
 
 
 def scan_string_for_encoding(string):
     """Read a string and return the encoding identified within."""
-    m = re.search('''(?:encoding|charset)=['"]*([a-zA-Z0-9\-]+)['"]*''', string)
+    m = re.search(RE_ENCODING, string)
     if m:
         return m.groups()[0]
     return None
@@ -23,7 +29,7 @@ def scan_string_for_encoding(string):
 
 def scan_bytes_for_encoding(bytes):
     """Read a byte sequence and return the encoding identified within."""
-    m = re.search(b'''(?:encoding|charset)=['"]*([a-zA-Z0-9\-]+)['"]*''', bytes)
+    m = re.search(RE_ENCODING.encode('ascii'), bytes)
     if m:
         encoding = m.groups()[0]
         return encoding.decode('ascii')
@@ -37,7 +43,8 @@ def decode(bytes, encodings):
             body = bytes.decode(encoding)
             return body
         except UnicodeDecodeError:
-            pass # Try the next in the list.
+            # Try the next in the list.
+            pass
     return None
 
 
@@ -48,11 +55,14 @@ class InsertResponseCommand(sublime_plugin.TextCommand):
 
     """
 
-    def run(self, edit, status_line="", headers="", body="", eol="\n"):
+    def run(self, edit, status_line="", headers="", body="", eol="\n",
+            encoding="UTF-8"):
 
         pos = 0
         start = 0
         end = 0
+
+        self.view.set_encoding(encoding)
 
         if status_line:
             pos += self.view.insert(edit, pos, status_line + eol)
@@ -85,16 +95,17 @@ class ResterHttpRequestCommand(sublime_plugin.TextCommand):
         if thread.is_alive():
             # This animates a little activity indicator in the status area.
             before = i % 8
-            after = (7) - before
+            after = 7 - before
             if not after:
                 dir = -1
             if not before:
                 dir = 1
             i += dir
-            message = "RESTer [%s=%s]" %(" " * before, " " * after)
+            message = "RESTer [%s=%s]" % (" " * before, " " * after)
             self.view.set_status("rester", message)
-            sublime.set_timeout(
-                    lambda: self._handle_thread(thread, i, dir), 100)
+            sublime.set_timeout(lambda:
+                                self._handle_thread(thread, i, dir), 100)
+
         elif isinstance(thread.result, http.client.HTTPResponse):
             # Success.
             self._complete_thread(thread.result)
@@ -122,13 +133,13 @@ class ResterHttpRequestCommand(sublime_plugin.TextCommand):
             version = "1.1"
         else:
             version = "1.0"
-        status_line = "%s/%s %d %s" %(protocol, version, response.status,
-                                     response.reason)
+        status_line = "%s/%s %d %s" % (protocol, version, response.status,
+                                       response.reason)
 
         # Build the headers
         headers = []
         for (key, value) in response.getheaders():
-            headers.append("%s: %s" %(key, value))
+            headers.append("%s: %s" % (key, value))
         headers = eol.join(headers)
 
         # Decode the body from a list of bytes
@@ -201,6 +212,7 @@ class ResterHttpRequestCommand(sublime_plugin.TextCommand):
         command_list = settings.get("response_body_commands", [])
         for command in command_list:
 
+            # Run by default, unless there is a content-type member to filter.
             run = True
 
             # If this command has a content-type list, only run if the
@@ -208,21 +220,25 @@ class ResterHttpRequestCommand(sublime_plugin.TextCommand):
             if "content-type" in command:
                 run = False
                 if actual_content_type:
-                    test_content_type = command["content-type"]
-                    if isinstance(test_content_type, str):
-                        run = actual_content_type == test_content_type.lower()
+                    test_types = command["content-type"]
+
+                    # String: Test if match.
+                    if isinstance(test_types, str):
+                        run = actual_content_type == test_types.lower()
+
+                    # Iterable: Test if contained.
                     # Check iterable for stringness of all items.
                     # Will raise TypeError if some_object is not iterable
-                    elif all(isinstance(item, str) for item \
-                                                    in test_content_type):
-                        run = actual_content_type in [content_type.lower() \
-                                for content_type in test_content_type]
+                    elif all(isinstance(item, str) for item in test_types):
+                        test_types = [test.lower() for test in test_types]
+                        run = actual_content_type in test_types
+
                     else:
                         raise TypeError
 
-        if run:
-            for commandName in command["commands"]:
-                view.run_command(commandName)
+            if run:
+                for commandName in command["commands"]:
+                    view.run_command(commandName)
 
     def _get_selection(self):
         """Return the selected text or the entire buffer."""
@@ -289,7 +305,8 @@ class HttpRequestThread(threading.Thread):
                          headers=self._headers,
                          body=self._body)
         except socket.gaierror:
-            self.result = "Unable to make request. Make sure the hostname is valid."
+            self.result = "Unable to make request. "
+            self.result += "Make sure the hostname is valid."
             conn.close()
             return
 
@@ -317,12 +334,12 @@ class HttpRequestThread(threading.Thread):
         # TODO Allow for HTTPS
         protocol = "HTTP/1.1"
 
-        lines.append("%s %s %s" %(self._method,
-                                  self._get_requet_uri(),
-                                  protocol))
+        lines.append("%s %s %s" % (self._method,
+                                   self._get_requet_uri(),
+                                   protocol))
 
         for key in self._headers:
-            lines.append("%s: %s" %(key, self._headers[key]))
+            lines.append("%s: %s" % (key, self._headers[key]))
 
         string = self._eol.join(lines)
 
@@ -424,28 +441,26 @@ class HttpRequestThread(threading.Thread):
 
         if headers and self._headers:
             self._headers = dict(list(self._headers.items()) +
-                                list(headers.items()))
+                                 list(headers.items()))
 
     def _read_request_line_dict(self, line):
         """Return a dicionary containing information about the request."""
 
-        # TODO Optimize regex
-
         # method-uri-protocol
         # Ex: GET /path HTTP/1.1
-        m = re.search('(?P<method>[A-Z]+) (?P<uri>[a-zA-Z0-9\-\/\.\_\:\?\#\[\]\@\!\$\&\=]+) (?P<protocol>.*)', line)
+        m = re.search(RE_METHOD + " " + RE_URI + " " + RE_PROTOCOL, line)
         if m:
             return m.groupdict()
 
         # method-uri
         # Ex: GET /path HTTP/1.1
-        m = re.search('(?P<method>[A-Z]+) (?P<uri>[a-zA-Z0-9\-\/\.\_\:\?\#\[\]\@\!\$\&\=]+)', line)
+        m = re.search(RE_METHOD + " " + RE_URI, line)
         if m:
             return m.groupdict()
 
         # uri
         # Ex: /path or http://hostname/path
-        m = re.search('(?P<uri>[a-zA-Z0-9\-\/\.\_\:\?\#\[\]\@\!\$\&\=]+)', line)
+        m = re.search(RE_URI, line)
         if m:
             return m.groupdict()
 
