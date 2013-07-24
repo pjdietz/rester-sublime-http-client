@@ -25,5 +25,8 @@
                 "prettyjson"
             ]
         }
-    ]
+    ],
+
+    // Timeout after this number of seconds.
+    "timeout": 15
 }

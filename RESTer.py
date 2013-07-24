@@ -292,13 +292,17 @@ class HttpRequestThread(threading.Thread):
     def run(self):
         """Method to run when the thread is started."""
 
+        # Load the settings.
+        settings = sublime.load_settings(SETTINGS_FILE)
+
         # Fail if the hostname is not set.
         if not self._hostname:
             self.result = "Unable to make request: Please provide a hostname."
             return
 
         # Create the connection.
-        conn = http.client.HTTPConnection(self._hostname)
+        timeout = settings.get("timeout")
+        conn = http.client.HTTPConnection(self._hostname, timeout=timeout)
 
         try:
             conn.request(self._method,
@@ -312,12 +316,17 @@ class HttpRequestThread(threading.Thread):
             return
 
         # Output the request to the console.
-        settings = sublime.load_settings(SETTINGS_FILE)
         if settings.get("output_request", True):
             print(self._get_request_as_string())
 
         # Read the response.
-        resp = conn.getresponse()
+        try:
+            resp = conn.getresponse()
+        except socket.timeout:
+            self.result = "Request timed out."
+            conn.close()
+            return
+
         conn.close()
         self.result = resp
 
