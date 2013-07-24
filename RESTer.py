@@ -413,6 +413,20 @@ class HttpRequestThread(threading.Thread):
         if not has_host_header and self._hostname:
             self._headers["Host"] = self._hostname
 
+        # If there is still no hostname, but there is a path, try re-parsing
+        # the path with // prepended.
+        #
+        # From the Python documentation:
+        # Following the syntax specifications in RFC 1808, urlparse recognizes
+        # a netloc only if it is properly introduced by ‘//’. Otherwise the
+        # input is presumed to be a relative URL and thus to start with a path
+        # component.
+        #
+        if not self._hostname and self._path:
+            uri = urlparse("//" + self._path)
+            self._hostname = uri.hostname
+            self._path = uri.path
+
     def _parse_request_line(self, line):
         """Parse the first line of the request"""
 
