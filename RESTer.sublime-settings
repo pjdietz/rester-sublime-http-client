@@ -4,7 +4,7 @@
 
     // Default headers to add for each request.
     "default_headers": {
-        "Accept-Encoding": "gzip",
+        "Accept-Encoding": "gzip, deflate",
         "Cache-control": "no-cache"
     },
 

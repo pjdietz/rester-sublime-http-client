@@ -4,6 +4,7 @@ import re
 import socket
 import threading
 from urllib.parse import urlparse
+import zlib
 
 import sublime
 import sublime_plugin
@@ -143,6 +144,9 @@ class ResterHttpRequestCommand(sublime_plugin.TextCommand):
             content_encoding = content_encoding.lower()
             if "gzip" in content_encoding:
                 body_bytes = gzip.decompress(body_bytes)
+            elif "deflate" in content_encoding:
+                # Negatie wbits to supress the standard gzip header.
+                body_bytes = zlib.decompress(body_bytes, -15)
 
         # Decode the body. The hard part here is finding the right encoding.
         # To do this, create a list of possible matches.
