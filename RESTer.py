@@ -13,10 +13,7 @@ RE_METHOD = """(?P<method>[A-Z]+)"""
 RE_URI = """(?P<uri>[a-zA-Z0-9\-\/\.\_\:\?\#\[\]\@\!\$\&\=]+)"""
 RE_PROTOCOL = """(?P<protocol>.*)"""
 RE_ENCODING = """(?:encoding|charset)=['"]*([a-zA-Z0-9\-]+)['"]*"""
-
-
-# Read the settings.
-settings = sublime.load_settings("RESTer.sublime-settings")
+SETTINGS_FILE = "RESTer.sublime-settings"
 
 
 def scan_string_for_encoding(string):
@@ -45,7 +42,7 @@ def decode(bytes, encodings):
         except UnicodeDecodeError:
             # Try the next in the list.
             pass
-    return None
+    raise DecodeError
 
 
 class InsertResponseCommand(sublime_plugin.TextCommand):
@@ -55,14 +52,11 @@ class InsertResponseCommand(sublime_plugin.TextCommand):
 
     """
 
-    def run(self, edit, status_line="", headers="", body="", eol="\n",
-            encoding="UTF-8"):
+    def run(self, edit, status_line="", headers="", body="", eol="\n"):
 
         pos = 0
         start = 0
         end = 0
-
-        self.view.set_encoding(encoding)
 
         if status_line:
             pos += self.view.insert(edit, pos, status_line + eol)
@@ -109,8 +103,6 @@ class ResterHttpRequestCommand(sublime_plugin.TextCommand):
         elif isinstance(thread.result, http.client.HTTPResponse):
             # Success.
             self._complete_thread(thread.result)
-            self.view.erase_status("rester")
-            sublime.status_message("RESTer Request Complete")
         elif isinstance(thread.result, str):
             # Failed.
             self.view.erase_status("rester")
@@ -168,6 +160,9 @@ class ResterHttpRequestCommand(sublime_plugin.TextCommand):
         if encoding:
             encodings.append(encoding)
 
+        # Load the settings
+        settings = sublime.load_settings(SETTINGS_FILE)
+
         # Add any default encodings not already discovered.
         default_encodings = settings.get("default_response_encodings", [])
         for encoding in default_encodings:
@@ -175,11 +170,10 @@ class ResterHttpRequestCommand(sublime_plugin.TextCommand):
                 encodings.append(encoding)
 
         # Decoding using the encodings discovered.
-        body = decode(body_bytes, encodings)
-        if body is None:
-            print("ERROR!")
-            return
-            # TODO: Show error message.
+        try:
+            body = decode(body_bytes, encodings)
+        except DecodeError:
+            body = "{Unable to decode body}"
 
         # Normalize the line endings
         body = body.replace("\r\n", "\n").replace("\r", "\n")
@@ -240,6 +234,10 @@ class ResterHttpRequestCommand(sublime_plugin.TextCommand):
                 for commandName in command["commands"]:
                     view.run_command(commandName)
 
+        # Write the status message.
+        self.view.erase_status("rester")
+        sublime.status_message("RESTer Request Complete")
+
     def _get_selection(self):
         """Return the selected text or the entire buffer."""
         sels = self.view.sel()
@@ -272,6 +270,9 @@ class HttpRequestThread(threading.Thread):
 
         threading.Thread.__init__(self)
 
+        # Load the settings
+        settings = sublime.load_settings(SETTINGS_FILE)
+
         # Store members and set defaults.
         self._eol = eol
         self._scheme = "http"
@@ -280,7 +281,7 @@ class HttpRequestThread(threading.Thread):
         self._query = None
         self._method = "GET"
         self._header_lines = []
-        self._headers = settings.get("default_headers")
+        self._headers = settings.get("default_headers", {})
         if not isinstance(self._headers, dict):
             self._headers = {}
         self._body = None
@@ -311,6 +312,7 @@ class HttpRequestThread(threading.Thread):
             return
 
         # Output the request to the console.
+        settings = sublime.load_settings(SETTINGS_FILE)
         if settings.get("output_request", True):
             print(self._get_request_as_string())
 
@@ -465,3 +467,7 @@ class HttpRequestThread(threading.Thread):
             return m.groupdict()
 
         return None
+
+
+class DecodeError(Exception):
+    pass
