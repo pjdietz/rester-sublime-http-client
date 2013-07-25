@@ -468,6 +468,7 @@ class HttpRequestThread(threading.Thread):
         overrides = {}
 
         for header in self._header_lines:
+            header = header.lstrip()
 
             # Comments begin with #
             if header[0] == "#":
@@ -476,7 +477,7 @@ class HttpRequestThread(threading.Thread):
             # Overrides begin with @
             elif header[0] == "@" and ":" in header:
                 (key, value) = header[1:].split(":", 1)
-                overrides[key] = json.loads(value.strip())
+                overrides[key.strip()] = json.loads(value.strip())
 
             # All else are headers
             elif ":" in header:
