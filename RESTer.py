@@ -1,5 +1,6 @@
 import http.client
 import gzip
+import json
 import re
 import socket
 import threading
@@ -103,7 +104,7 @@ class ResterHttpRequestCommand(sublime_plugin.TextCommand):
 
         elif isinstance(thread.result, http.client.HTTPResponse):
             # Success.
-            self._complete_thread(thread.result)
+            self._complete_thread(thread.result, thread.settings)
         elif isinstance(thread.result, str):
             # Failed.
             self.view.erase_status("rester")
@@ -113,7 +114,7 @@ class ResterHttpRequestCommand(sublime_plugin.TextCommand):
             self.view.erase_status("rester")
             sublime.status_message("Unable to make request.")
 
-    def _complete_thread(self, response):
+    def _complete_thread(self, response, settings):
 
         # Create a new file.
         view = self.view.window().new_file()
@@ -163,9 +164,6 @@ class ResterHttpRequestCommand(sublime_plugin.TextCommand):
         encoding = scan_bytes_for_encoding(body_bytes)
         if encoding:
             encodings.append(encoding)
-
-        # Load the settings
-        settings = sublime.load_settings(SETTINGS_FILE)
 
         # Add any default encodings not already discovered.
         default_encodings = settings.get("default_response_encodings", [])
@@ -278,6 +276,7 @@ class HttpRequestThread(threading.Thread):
         settings = sublime.load_settings(SETTINGS_FILE)
 
         # Store members and set defaults.
+        self.settings = OverrideableSettings(settings)
         self._eol = eol
         self._scheme = "http"
         self._hostname = None
@@ -296,16 +295,13 @@ class HttpRequestThread(threading.Thread):
     def run(self):
         """Method to run when the thread is started."""
 
-        # Load the settings.
-        settings = sublime.load_settings(SETTINGS_FILE)
-
         # Fail if the hostname is not set.
         if not self._hostname:
             self.result = "Unable to make request: Please provide a hostname."
             return
 
         # Create the connection.
-        timeout = settings.get("timeout")
+        timeout = self.settings.get("timeout")
         conn = http.client.HTTPConnection(self._hostname, timeout=timeout)
 
         try:
@@ -320,7 +316,7 @@ class HttpRequestThread(threading.Thread):
             return
 
         # Output the request to the console.
-        if settings.get("output_request", True):
+        if self.settings.get("output_request", True):
             print(self._get_request_as_string())
 
         # Read the response.
@@ -461,16 +457,37 @@ class HttpRequestThread(threading.Thread):
                     self._scheme = "https"
 
     def _parse_header_lines(self):
-        """Build self._headers dictionary"""
+        """Parse the lines before the body.
+
+        Build self._headers dictionary
+        Read the overrides for the settings
+
+        """
+
         headers = {}
+        overrides = {}
+
         for header in self._header_lines:
-            if ":" in header:
+
+            # Comments begin with #
+            if header[0] == "#":
+                pass
+
+            # Overrides begin with @
+            elif header[0] == "@" and ":" in header:
+                (key, value) = header[1:].split(":", 1)
+                overrides[key] = json.loads(value.strip())
+
+            # All else are headers
+            elif ":" in header:
                 (key, value) = header.split(":", 1)
                 headers[key] = value.strip()
 
         if headers and self._headers:
             self._headers = dict(list(self._headers.items()) +
                                  list(headers.items()))
+
+        self.settings.set_overrides(overrides)
 
     def _read_request_line_dict(self, line):
         """Return a dicionary containing information about the request."""
@@ -494,6 +511,34 @@ class HttpRequestThread(threading.Thread):
             return m.groupdict()
 
         return None
+
+
+class OverrideableSettings():
+    """
+    Class for adding a layer of overrides on top of a Settings object
+
+    The class is read-only. If a dictionary-like _overrides member is present,
+    the get() method will look there first for a setting before reading from
+    the _settings member.
+    """
+
+    def __init__(self, settings=None, overrides=None):
+        self._settings = settings
+        self._overrides = overrides
+
+    def set_settings(self, settings):
+        self._settings = settings
+
+    def set_overrides(self, overrides):
+        self._overrides = overrides
+
+    def get(self, setting, default=None):
+        if self._overrides and setting in self._overrides:
+            return self._overrides[setting]
+        elif self._settings:
+            return self._settings.get(setting, default)
+        else:
+            return default
 
 
 class DecodeError(Exception):
