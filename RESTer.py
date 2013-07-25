@@ -4,7 +4,7 @@ import json
 import re
 import socket
 import threading
-from urllib.parse import urlparse
+import urllib.parse
 import zlib
 
 import sublime
@@ -281,7 +281,7 @@ class HttpRequestThread(threading.Thread):
         self._scheme = "http"
         self._hostname = None
         self._path = None
-        self._query = None
+        self._query = {}
         self._method = "GET"
         self._header_lines = []
         self._headers = settings.get("default_headers", {})
@@ -334,7 +334,11 @@ class HttpRequestThread(threading.Thread):
         """Return the path + query string for the request."""
         uri = self._path
         if self._query:
-            uri += "?" + self._query
+            query = []
+            for (name, values) in self._query.items():
+                for value in values:
+                    query.append(name + "=" + value)
+            uri += "?" + "&".join(query)
         return uri
 
     def _get_request_as_string(self):
@@ -423,7 +427,7 @@ class HttpRequestThread(threading.Thread):
         # component.
         #
         if not self._hostname and self._path:
-            uri = urlparse("//" + self._path)
+            uri = urllib.parse.urlparse("//" + self._path)
             self._hostname = uri.hostname
             self._path = uri.path
 
@@ -437,13 +441,13 @@ class HttpRequestThread(threading.Thread):
             return
 
         # Parse the URI.
-        uri = urlparse(request_line["uri"])
+        uri = urllib.parse.urlparse(request_line["uri"])
 
         # Copy from the parsed URI.
         self._scheme = uri.scheme
         self._hostname = uri.hostname
         self._path = uri.path
-        self._query = uri.query
+        self._query = urllib.parse.parse_qs(uri.query)
 
         # Read the method from the request line. Default is GET.
         if "method" in request_line:
@@ -478,6 +482,24 @@ class HttpRequestThread(threading.Thread):
             elif header[0] == "@" and ":" in header:
                 (key, value) = header[1:].split(":", 1)
                 overrides[key.strip()] = json.loads(value.strip())
+
+            # Query parameters begin with ? or &
+            elif header[0] == "?" or header[0] == "&":
+
+                if "=" in header:
+                    (key, value) = header[1:].split("=", 1)
+                elif ":" in header:
+                    (key, value) = header[1:].split(":", 1)
+                else:
+                    key, value = None, None
+
+                if key and value:
+                    key = key.strip()
+                    value = urllib.parse.quote(value.strip())
+                    if key in self._query:
+                        self._query[key].append(value)
+                    else:
+                        self._query[key] = [value]
 
             # All else are headers
             elif ":" in header:

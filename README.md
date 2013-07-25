@@ -42,12 +42,18 @@ Here are some example request lines:
 
 ```
 GET /my-endpoint HTTP/1.1
-Host: /api.my-site.com
+Host: api.my-site.com
+```
 
+```
 GET http://api.my-site.com/my-endpoint
+```
 
+```
 http://api.my-site.com/my-endpoint
+```
 
+```
 api.my-site.com/my-endpoint
 ```
 
@@ -60,6 +66,47 @@ RESTer parses the lines immediately following the first non-empty line up to the
 ### Body
 
 To supply a message body for POST and PUT requests, add an empty line after the last header.
+
+### Query Parameters
+
+For requests with many query parameters, you may want to spread your request across a number of lines. RESTer will parse any lines before the body that begin with <code>?</code> or <code>&</code> as query parameters. You may use <code>=</code> or <code>:</code> to separate the key from the value.
+
+The following example requests are equivalent:
+
+All in the URI
+```
+http://api.mysite.com/?cat=molly&dog=bear
+```
+
+With new lines
+```
+http://api.mysite.com/
+?cat=molly
+&dog=bear
+```
+
+Indented, using colons, and only using ?
+```
+http://api.mysite.com/
+    ? cat: molly
+    ? dog: bear
+```
+
+#### Percent Encoding
+
+One thing to note is that RESTer assumes that anything you place directly in the request line is the way you want it, but query parameters added on individual lines are assumed to be in plain text. So, values of query parameters added on individual lines are percent encoded.
+
+These requests are equivalent:
+
+```
+http://api.mysite.com/?item=I520like%20spaces
+```
+
+```
+http://api.mysite.com/
+    ? item: I like spaces
+```
+
 
 ### Comments
 
@@ -93,21 +140,23 @@ RESTer has some other features that you can customize through settings. To custo
 
 To include a set of headers with each request, add them to the <code>"default_headers"</code> setting. This is a dictionary with the header names as the keys.
 
-```
-// Default headers to add for each request.
-"default_headers": {
-    "Accept-Encoding": "gzip, deflate",
-    "Cache-control": "no-cache"
+```json
+{
+    "default_headers": {
+        "Accept-Encoding": "gzip, deflate",
+        "Cache-control": "no-cache"
+    }
 }
 ```
 
 ### Default Response Encodings
 
-RESTer can try to discern the encoding for a respones. This doesn't always work, so it's a good idea to give it some encodings to try. Do this by supplying a list for the <code>"default_response_encodings"</code> setting.
+RESTer can try to discern the encoding for a response. This doesn't always work, so it's a good idea to give it some encodings to try. Do this by supplying a list for the <code>"default_response_encodings"</code> setting.
 
-```
-// List of encodings to try if not discernable from the response.
-"default_response_encodings": ["utf-8", "ISO-8859-1", "ascii"],
+```json
+{
+    "default_response_encodings": ["utf-8", "ISO-8859-1", "ascii"]
+}
 ```
 
 ### Resonse Body Commands
@@ -116,19 +165,20 @@ After RESTer writes the response to the new tab, it can run a number of Sublime 
 
 The <code>"response_body_commands"</code> settings is an array or objects. Each object must have a <code>"commands"</code> member with a value that is an array of commands. The object may optionally have a <code>"content-type"</code> member that has a value that is an array of content-types, any one of which will allow the command to be used.
 
-```
-// Commands to run on the body, based on content-type
-"response_body_commands": [
-    {
-        "content-type": [
-            "application/json",
-            "text/json"
-        ],
-        "commands": [
-            "prettyjson"
-        ]
-    }
-]
+```json
+{
+    "response_body_commands": [
+        {
+            "content-type": [
+                "application/json",
+                "text/json"
+            ],
+            "commands": [
+                "prettyjson"
+            ]
+        }
+    ]
+}
 ```
 
 If you're not sure what the command is for a given feature, take a peak in the package's <code>Default.sublime-commands</code> file. You can test a command out by making a selection, opening the Python console, and entering <code>view.run_command("{command_name}")</code> where <code>{command}</code> is the string name for the command from the <code>Default.sublime-commands</code> file.
