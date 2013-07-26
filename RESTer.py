@@ -281,6 +281,7 @@ class HttpRequestThread(threading.Thread):
         self._scheme = "http"
         self._hostname = None
         self._path = None
+        self._port = 80
         self._query = {}
         self._method = "GET"
         self._header_lines = []
@@ -302,13 +303,21 @@ class HttpRequestThread(threading.Thread):
 
         # Create the connection.
         timeout = self.settings.get("timeout")
-        conn = http.client.HTTPConnection(self._hostname, timeout=timeout)
+        conn = http.client.HTTPConnection(self._hostname,
+                                          port=self._port,
+                                          timeout=timeout)
 
         try:
             conn.request(self._method,
                          self._get_requet_uri(),
                          headers=self._headers,
                          body=self._body)
+
+        except ConnectionRefusedError:
+            self.result = "Connection refused."
+            conn.close()
+            return
+
         except socket.gaierror:
             self.result = "Unable to make request. "
             self.result += "Make sure the hostname is valid."
@@ -448,6 +457,8 @@ class HttpRequestThread(threading.Thread):
         self._hostname = uri.hostname
         self._path = uri.path
         self._query = urllib.parse.parse_qs(uri.query)
+        if uri.port:
+            self._port = uri.port
 
         # Read the method from the request line. Default is GET.
         if "method" in request_line:
