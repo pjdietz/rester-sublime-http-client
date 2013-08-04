@@ -27,6 +27,10 @@
         }
     ],
 
+
+
+    "request_commands": ["text_replacement", "junk", "not_real"],
+
     // Timeout after this number of seconds.
     "timeout": 15
 }

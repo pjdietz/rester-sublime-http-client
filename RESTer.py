@@ -76,10 +76,57 @@ class InsertResponseCommand(sublime_plugin.TextCommand):
             self.view.sel().add(selection)
 
 
-class ResterHttpRequestCommand(sublime_plugin.TextCommand):
+class ResterHttpRequestCommand(sublime_plugin.WindowCommand):
+    def run(self):
+
+        # Store references.
+        self._request_view = self.window.active_view()
+        self._settings = sublime.load_settings(SETTINGS_FILE)
+
+        # Store the current change count and run the request commands.
+        changes = self._request_view.change_count()
+        self._run_request_commands()
+        changes = self._request_view.change_count() - changes
+
+        # Read the selected text.
+        selection = self._get_selection()
+        print(selection)
+
+        # Undo the request commands to return to the starting state.
+        for i in range(changes):
+            self._request_view.run_command("undo")
+
+    def _run_request_commands(self):
+        """Check settings for a series of commands to run on the selection"""
+
+        view = self._request_view
+        commands = self._settings.get("request_commands", [])
+
+        for command in commands:
+            view.run_command(command)
+
+    def _get_selection(self):
+        """Return the selected text or the entire buffer."""
+        view = self._request_view
+        sels = view.sel()
+        if len(sels) == 1 and sels[0].empty():
+            # No selection. Use the entire buffer.
+            selection = view.substr(sublime.Region(0, view.size()))
+        else:
+            # Concatenate the selections into one large string.
+            selection = ""
+            for sel in sels:
+                selection += view.substr(sel)
+        return selection
+
+# -----------------------------------------------------------------------------
+
+
+class ResterHttpRequestCommandDep(sublime_plugin.TextCommand):
     """Make an HTTP request. Display the response in a new file."""
 
     def run(self, edit):
+        self._run_request_commands()
         text = self._get_selection()
         eol = self._get_end_of_line_character()
         thread = HttpRequestThread(text, eol)
@@ -239,6 +286,16 @@ class ResterHttpRequestCommand(sublime_plugin.TextCommand):
         # Write the status message.
         self.view.erase_status("rester")
         sublime.status_message("RESTer Request Complete")
+
+    def _run_request_commands(self):
+        """Check settings for a series of commands to run on the selection"""
+
+        # Load the settings
+        settings = sublime.load_settings(SETTINGS_FILE)
+        commands = settings.get("request_commands", [])
+
+        for command in commands:
+            self.view.run_command(command)
 
     def _get_selection(self):
         """Return the selected text or the entire buffer."""
