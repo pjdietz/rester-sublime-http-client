@@ -18,6 +18,23 @@ RE_ENCODING = """(?:encoding|charset)=['"]*([a-zA-Z0-9\-]+)['"]*"""
 SETTINGS_FILE = "RESTer.sublime-settings"
 
 
+def get_end_of_line_character(view):
+    """Return the EOL character from the view's settings."""
+    line_endings = view.settings().get("default_line_ending")
+    if line_endings == "windows":
+        return "\r\n"
+    elif line_endings == "mac":
+        return "\r"
+    else:
+        return "\n"
+
+def normalize_line_endings(string, eol):
+    """Return a string with consistent line endings."""
+    string = string.replace("\r\n", "\n").replace("\r", "\n")
+    if eol != "\n":
+        string = string.replace("\n", eol)
+    return string
+
 def scan_string_for_encoding(string):
     """Read a string and return the encoding identified within."""
     m = re.search(RE_ENCODING, string)
@@ -77,6 +94,7 @@ class InsertResponseCommand(sublime_plugin.TextCommand):
 
 
 class ResterHttpRequestCommand(sublime_plugin.WindowCommand):
+
     def run(self):
 
         # Store references.
@@ -89,12 +107,17 @@ class ResterHttpRequestCommand(sublime_plugin.WindowCommand):
         changes = self._request_view.change_count() - changes
 
         # Read the selected text.
-        selection = self._get_selection()
-        print(selection)
+        text = self._get_selection()
+        self._eol = get_end_of_line_character(self._request_view)
 
         # Undo the request commands to return to the starting state.
         for i in range(changes):
             self._request_view.run_command("undo")
+
+        # Create, start, and handle a thread for the selection.
+        thread = HttpRequestThread(text, self._eol, self._settings)
+        thread.start()
+        self._handle_thread(thread)
 
     def _run_request_commands(self):
         """Check settings for a series of commands to run on the selection"""
@@ -119,20 +142,6 @@ class ResterHttpRequestCommand(sublime_plugin.WindowCommand):
                 selection += view.substr(sel)
         return selection
 
-# -----------------------------------------------------------------------------
-
-
-class ResterHttpRequestCommandDep(sublime_plugin.TextCommand):
-    """Make an HTTP request. Display the response in a new file."""
-
-    def run(self, edit):
-        self._run_request_commands()
-        text = self._get_selection()
-        eol = self._get_end_of_line_character()
-        thread = HttpRequestThread(text, eol)
-        thread.start()
-        self._handle_thread(thread)
-
     def _handle_thread(self, thread, i=0, dir=1):
 
         if thread.is_alive():
@@ -145,7 +154,7 @@ class ResterHttpRequestCommandDep(sublime_plugin.TextCommand):
                 dir = 1
             i += dir
             message = "RESTer [%s=%s]" % (" " * before, " " * after)
-            self.view.set_status("rester", message)
+            self._request_view.set_status("rester", message)
             sublime.set_timeout(lambda:
                                 self._handle_thread(thread, i, dir), 100)
 
@@ -154,19 +163,18 @@ class ResterHttpRequestCommandDep(sublime_plugin.TextCommand):
             self._complete_thread(thread.result, thread.settings)
         elif isinstance(thread.result, str):
             # Failed.
-            self.view.erase_status("rester")
+            self._request_view.erase_status("rester")
             sublime.status_message(thread.result)
         else:
             # Failed.
-            self.view.erase_status("rester")
+            self._request_view.erase_status("rester")
             sublime.status_message("Unable to make request.")
 
     def _complete_thread(self, response, settings):
 
         # Create a new file.
-        view = self.view.window().new_file()
-
-        eol = self._get_end_of_line_character()
+        view = self.window.new_file()
+        eol = self._eol
 
         # Build the status line (e.g., HTTP/1.1 200 OK)
         protocol = "HTTP"
@@ -224,14 +232,12 @@ class ResterHttpRequestCommandDep(sublime_plugin.TextCommand):
         except DecodeError:
             body = "{Unable to decode body}"
 
-        # Normalize the line endings
-        body = body.replace("\r\n", "\n").replace("\r", "\n")
-        eol = self._get_end_of_line_character()
-        if eol != "\n":
-            body = body.replace("\n", eol)
+        # Normalize the line endings.
+        body = normalize_line_endings(body, eol)
 
         # Insert the response and select the body.
         if settings.get("body_only") and 200 <= response.status <= 299:
+            # TODO Use built in insert.
             # Output the body only, but only on success.
             view.run_command("insert_response", {
                 "body": body,
@@ -284,53 +290,28 @@ class ResterHttpRequestCommandDep(sublime_plugin.TextCommand):
                     view.run_command(commandName)
 
         # Write the status message.
-        self.view.erase_status("rester")
+        self._request_view.erase_status("rester")
         sublime.status_message("RESTer Request Complete")
-
-    def _run_request_commands(self):
-        """Check settings for a series of commands to run on the selection"""
-
-        # Load the settings
-        settings = sublime.load_settings(SETTINGS_FILE)
-        commands = settings.get("request_commands", [])
-
-        for command in commands:
-            self.view.run_command(command)
-
-    def _get_selection(self):
-        """Return the selected text or the entire buffer."""
-        sels = self.view.sel()
-        if len(sels) == 1 and sels[0].empty():
-            # No selection. Use the entire buffer.
-            selection = self.view.substr(sublime.Region(0, self.view.size()))
-        else:
-            # Concatenate the selections into one large string.
-            selection = ""
-            for sel in sels:
-                selection += self.view.substr(sel)
-        return selection
-
-    def _get_end_of_line_character(self):
-        """Return the EOL character from the view's settings."""
-        line_endings = self.view.settings().get("default_line_ending")
-        if line_endings == "windows":
-            return "\r\n"
-        elif line_endings == "mac":
-            return "\r"
-        else:
-            return "\n"
 
 
 class HttpRequestThread(threading.Thread):
     """Thread sublcass for making an HTTP request given a string."""
 
-    def __init__(self, string, eol="\n"):
-        """Create a new request object"""
+    def __init__(self, string, eol, settings):
+        """Create a new request object
+
+        @param string: The text of the request to perform, including headers,
+            settings overrides, etc.
+        @type string: str
+
+        @param eol: The line ending character used throughout string
+        @type string: str
+
+        @param settings: A Sublime settings instance
+        @type settings: sublime.Settings
+        """
 
         threading.Thread.__init__(self)
-
-        # Load the settings
-        settings = sublime.load_settings(SETTINGS_FILE)
 
         # Store members and set defaults.
         self.settings = OverrideableSettings(settings)
@@ -429,28 +410,18 @@ class HttpRequestThread(threading.Thread):
 
         return string
 
-    def _normalize_line_endings(self, string):
-        """Return a string with consistent line endings."""
-        string = string.replace("\r\n", "\n").replace("\r", "\n")
-        if self._eol != "\n":
-            string = string.replace("\n", self._eol)
-        return string
-
     def _parse_string(self, string):
         """Determine instance members from the contents of the string."""
 
         # Pre-parse clean-up.
         string = string.lstrip()
-        string = self._normalize_line_endings(string)
+        string = normalize_line_endings(string, self._eol)
 
         # Split the string into lines.
         lines = string.split(self._eol)
 
-        # The first line is the request line.
-        request_line = lines[0]
-
         # Parse the first line as the request line.
-        self._parse_request_line(request_line)
+        self._parse_request_line(lines[0])
 
         # All lines following the request line are headers until an empty line.
         # All content after the empty line is the request body.
@@ -510,7 +481,8 @@ class HttpRequestThread(threading.Thread):
         uri = urllib.parse.urlparse(request_line["uri"])
 
         # Copy from the parsed URI.
-        self._scheme = uri.scheme
+        if uri.scheme:
+            self._scheme = uri.scheme
         self._hostname = uri.hostname
         self._path = uri.path
         self._query = urllib.parse.parse_qs(uri.query)
@@ -520,13 +492,6 @@ class HttpRequestThread(threading.Thread):
         # Read the method from the request line. Default is GET.
         if "method" in request_line:
             self._method = request_line["method"]
-
-        # Read the scheme from the URI or request line. Default is http.
-        if not self._scheme:
-            if "protocol" in request_line:
-                protocol = request_line["protocol"].upper()
-                if "HTTPS" in protocol:
-                    self._scheme = "https"
 
     def _parse_header_lines(self):
         """Parse the lines before the body.
