@@ -92,53 +92,44 @@ class ResterHttpRequestCommand(sublime_plugin.WindowCommand):
         thread.start()
         self._handle_thread(thread)
 
-    def _run_request_commands(self):
-        """Check settings for a series of commands to run on the selection"""
+    def _normalize_command(self, command):
 
+        # Normalize the command to a dictionary.
+        valid = False
+        if isinstance(command, str):
+            command = {"name": command}
+            valid = True
+        elif isinstance(command, dict):
+            if "name" in command:
+                valid = True
+
+        # Skip here if invalid.
+        if not valid:
+            print("Skipping invalid command.")
+            print("Each command must be a string or a dict with a 'name'")
+            print(command)
+            return None
+
+        # Ensure each command has all needed fields.
+        if not "args" in command:
+            command["args"] = None
+
+        return command
+
+    def _run_request_commands(self):
         view = self._request_view
         commands = self._settings.get("request_commands", [])
-
         for command in commands:
-            view.run_command(command)
+            command = self._normalize_command(command)
+            if command:
+                view.run_command(command["name"], command["args"])
 
     def _run_response_commands(self, view, response, settings):
-
-        # Read the content-type header, if present.
-        actual_content_type = response.getheader("content-type")
-        if actual_content_type:
-            actual_content_type = actual_content_type.lower()
-
-        # Run commands on the inserted body
-        command_list = settings.get("response_body_commands", [])
-        for command in command_list:
-
-            # Run by default, unless there is a content-type member to filter.
-            run = True
-
-            # If this command has a content-type list, only run if the
-            # actual content type matches an item in the list.
-            if "content-type" in command:
-                run = False
-                if actual_content_type:
-                    test_types = command["content-type"]
-
-                    # String: Test if match.
-                    if isinstance(test_types, str):
-                        run = actual_content_type == test_types.lower()
-
-                    # Iterable: Test if contained.
-                    # Check iterable for stringness of all items.
-                    # Will raise TypeError if some_object is not iterable
-                    elif all(isinstance(item, str) for item in test_types):
-                        test_types = [test.lower() for test in test_types]
-                        run = actual_content_type in test_types
-
-                    else:
-                        raise TypeError
-
-            if run:
-                for commandName in command["commands"]:
-                    view.run_command(commandName)
+        commands = settings.get("response_commands", [])
+        for command in commands:
+            command = self._normalize_command(command)
+            if command:
+                view.run_command(command["name"], command["args"])
 
     def _get_selection(self):
         """Return the selected text or the entire buffer."""

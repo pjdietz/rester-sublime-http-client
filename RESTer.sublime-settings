@@ -14,22 +14,18 @@
     // Output the request to the console.
     "output_request": true,
 
-    // Commands to run on the body, based on content-type
-    "response_body_commands": [
-        {
-            "content-type": [
-                "application/json",
-                "text/json"
-            ],
-            "commands": [
-                "prettyjson"
-            ]
+    // Commands to run on the request.
+    // These commands will be undone after the request is issued.
+    "request_commands": [{
+        "name": "text_replacement",
+        "args": {
+            "configuration": "development"
+            }
         }
     ],
 
-
-
-    "request_commands": ["text_replacement", "junk", "not_real"],
+    // Commands to run on the body of the resonse.
+    "response_commands": ["prettyjson"],
 
     // Timeout after this number of seconds.
     "timeout": 15
