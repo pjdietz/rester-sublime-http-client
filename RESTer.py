@@ -28,12 +28,14 @@ def get_end_of_line_character(view):
     else:
         return "\n"
 
+
 def normalize_line_endings(string, eol):
     """Return a string with consistent line endings."""
     string = string.replace("\r\n", "\n").replace("\r", "\n")
     if eol != "\n":
         string = string.replace("\n", eol)
     return string
+
 
 def scan_string_for_encoding(string):
     """Read a string and return the encoding identified within."""
@@ -62,35 +64,6 @@ def decode(bytes, encodings):
             # Try the next in the list.
             pass
     raise DecodeError
-
-
-class InsertResponseCommand(sublime_plugin.TextCommand):
-    """Output a response to a new file.
-
-    This TextCommand is for internal use and not intended for end users.
-
-    """
-
-    def run(self, edit, status_line="", headers="", body="", eol="\n"):
-
-        pos = 0
-        start = 0
-        end = 0
-
-        if status_line:
-            pos += self.view.insert(edit, pos, status_line + eol)
-        if headers:
-            pos += self.view.insert(edit, pos, headers + eol + eol)
-        if body:
-            start = pos
-            pos += self.view.insert(edit, pos, body)
-            end = pos
-
-        # Select the inserted response body.
-        if start != 0 and end != 0:
-            selection = sublime.Region(start, end)
-            self.view.sel().clear()
-            self.view.sel().add(selection)
 
 
 class ResterHttpRequestCommand(sublime_plugin.WindowCommand):
@@ -127,6 +100,45 @@ class ResterHttpRequestCommand(sublime_plugin.WindowCommand):
 
         for command in commands:
             view.run_command(command)
+
+    def _run_response_commands(self, view, response, settings):
+
+        # Read the content-type header, if present.
+        actual_content_type = response.getheader("content-type")
+        if actual_content_type:
+            actual_content_type = actual_content_type.lower()
+
+        # Run commands on the inserted body
+        command_list = settings.get("response_body_commands", [])
+        for command in command_list:
+
+            # Run by default, unless there is a content-type member to filter.
+            run = True
+
+            # If this command has a content-type list, only run if the
+            # actual content type matches an item in the list.
+            if "content-type" in command:
+                run = False
+                if actual_content_type:
+                    test_types = command["content-type"]
+
+                    # String: Test if match.
+                    if isinstance(test_types, str):
+                        run = actual_content_type == test_types.lower()
+
+                    # Iterable: Test if contained.
+                    # Check iterable for stringness of all items.
+                    # Will raise TypeError if some_object is not iterable
+                    elif all(isinstance(item, str) for item in test_types):
+                        test_types = [test.lower() for test in test_types]
+                        run = actual_content_type in test_types
+
+                    else:
+                        raise TypeError
+
+            if run:
+                for commandName in command["commands"]:
+                    view.run_command(commandName)
 
     def _get_selection(self):
         """Return the selected text or the entire buffer."""
@@ -170,31 +182,42 @@ class ResterHttpRequestCommand(sublime_plugin.WindowCommand):
             self._request_view.erase_status("rester")
             sublime.status_message("Unable to make request.")
 
-    def _complete_thread(self, response, settings):
+    def _read_headers(self, response):
+        """Read a string of the headers"""
+        status_line = self._read_status_line(response)
+        header_lines = self._read_header_lines(response)
+        headers = self._eol.join([status_line] + header_lines)
+        return headers
 
-        # Create a new file.
-        view = self.window.new_file()
-        eol = self._eol
+    def _read_status_line(self, response):
 
-        # Build the status line (e.g., HTTP/1.1 200 OK)
+        # Build and return the status line (e.g., HTTP/1.1 200 OK)
         protocol = "HTTP"
         if response.version == 11:
             version = "1.1"
         else:
             version = "1.0"
-        status_line = "%s/%s %d %s" % (protocol, version, response.status,
-                                       response.reason)
+        return "%s/%s %d %s" % (protocol, version, response.status,
+                                response.reason)
 
-        # Build the headers
+    def _read_header_lines(self, response):
+
+        # Build and return the header lines
         headers = []
         for (key, value) in response.getheaders():
             headers.append("%s: %s" % (key, value))
-        headers = eol.join(headers)
+        return headers
+
+    def _read_body(self, response, settings):
 
         # Decode the body from a list of bytes
         body_bytes = response.read()
+        body_bytes = self._unzip_body(body_bytes, response)
+        body = self._decode_body(body_bytes, response, settings)
+        body = normalize_line_endings(body, self._eol)
+        return body
 
-        # Unzip if needed.
+    def _unzip_body(self, body_bytes, response):
         content_encoding = response.getheader("content-encoding")
         if content_encoding:
             content_encoding = content_encoding.lower()
@@ -203,6 +226,9 @@ class ResterHttpRequestCommand(sublime_plugin.WindowCommand):
             elif "deflate" in content_encoding:
                 # Negatie wbits to supress the standard gzip header.
                 body_bytes = zlib.decompress(body_bytes, -15)
+        return body_bytes
+
+    def _decode_body(self, body_bytes, response, settings):
 
         # Decode the body. The hard part here is finding the right encoding.
         # To do this, create a list of possible matches.
@@ -232,62 +258,53 @@ class ResterHttpRequestCommand(sublime_plugin.WindowCommand):
         except DecodeError:
             body = "{Unable to decode body}"
 
-        # Normalize the line endings.
-        body = normalize_line_endings(body, eol)
+        return body
 
-        # Insert the response and select the body.
+    def _insert_and_select_response(self, view, response, settings, ):
+
+        # Read headers and body.
+        headers = self._read_headers(response)
+        body = self._read_body(response, settings)
+
+        start = 0
+        end = 0
+
         if settings.get("body_only") and 200 <= response.status <= 299:
-            # TODO Use built in insert.
-            # Output the body only, but only on success.
-            view.run_command("insert_response", {
-                "body": body,
-                "eol": eol
-            })
+
+            # Insert the body only, but only on success.
+            view.run_command("insert", {"characters": body})
+
         else:
-            # Output status, headers, and body.
-            view.run_command("insert_response", {
-                "status_line": status_line,
-                "headers": headers,
-                "body": body,
-                "eol": eol
-            })
 
-        # Read the content-type header, if present.
-        actual_content_type = response.getheader("content-type")
-        if actual_content_type:
-            actual_content_type = actual_content_type.lower()
+            # Insert the status line and headers. Store the file length.
+            view.run_command("insert", {"characters": headers})
+            view.run_command("insert", {"characters": (self._eol * 2)})
+            start = view.size()
 
-        # Run commands on the inserted body
-        command_list = settings.get("response_body_commands", [])
-        for command in command_list:
+            # Insert the body.
+            view.run_command("insert", {"characters": body})
 
-            # Run by default, unless there is a content-type member to filter.
-            run = True
+        end = view.size()
 
-            # If this command has a content-type list, only run if the
-            # actual content type matches an item in the list.
-            if "content-type" in command:
-                run = False
-                if actual_content_type:
-                    test_types = command["content-type"]
+        # Select the inserted response body.
+        if end > start:
+            selection = sublime.Region(start, end)
+            view.sel().clear()
+            view.sel().add(selection)
 
-                    # String: Test if match.
-                    if isinstance(test_types, str):
-                        run = actual_content_type == test_types.lower()
+    def _complete_thread(self, response, settings):
 
-                    # Iterable: Test if contained.
-                    # Check iterable for stringness of all items.
-                    # Will raise TypeError if some_object is not iterable
-                    elif all(isinstance(item, str) for item in test_types):
-                        test_types = [test.lower() for test in test_types]
-                        run = actual_content_type in test_types
+        # Create a new file.
+        view = self.window.new_file()
 
-                    else:
-                        raise TypeError
+        # Insert the response into the new file and select the body.
+        self._insert_and_select_response(view, response, settings)
 
-            if run:
-                for commandName in command["commands"]:
-                    view.run_command(commandName)
+        # Run commands on the selection.
+        self._run_response_commands(view, response, settings)
+
+        # Scroll to the top.
+        view.show(0)
 
         # Write the status message.
         self._request_view.erase_status("rester")
