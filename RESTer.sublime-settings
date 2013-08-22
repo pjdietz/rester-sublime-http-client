@@ -14,18 +14,25 @@
     // Output the request to the console.
     "output_request": true,
 
-    // Commands to run on the request.
+    // List of commands to run on the request.
     // These commands will be undone after the request is issued.
-    "request_commands": [{
-        "name": "text_replacement",
-        "args": {
-            "configuration": "development"
-            }
-        }
-    ],
+    "request_commands": ["merge_variables"],
 
     // Commands to run on the body of the resonse.
     "response_commands": ["prettyjson"],
+
+    // Each request or response command must be a string (the name of the
+    // command), or an object with a "name" member (the name of the command)
+    // and optionally an "args" member as an object of arguments to pass to the
+    // command.
+    //
+    // Example:
+    //     {
+    //         "name": "merge_variables",
+    //         "args": {
+    //             "active_sets": ["mysite", "mysite-dev"]
+    //          }
+    //     }
 
     // Timeout after this number of seconds.
     "timeout": 15
