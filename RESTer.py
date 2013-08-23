@@ -15,6 +15,7 @@ RE_METHOD = """(?P<method>[A-Z]+)"""
 RE_URI = """(?P<uri>[a-zA-Z0-9\-\/\.\_\:\?\#\[\]\@\!\$\&\=]+)"""
 RE_PROTOCOL = """(?P<protocol>.*)"""
 RE_ENCODING = """(?:encoding|charset)=['"]*([a-zA-Z0-9\-]+)['"]*"""
+RE_OVERRIDE = """^\s*@\s*([^\:]*)\s*:\s*(.*)$"""
 SETTINGS_FILE = "RESTer.sublime-settings"
 
 
@@ -72,16 +73,17 @@ class ResterHttpRequestCommand(sublime_plugin.WindowCommand):
 
         # Store references.
         self._request_view = self.window.active_view()
-        self._settings = sublime.load_settings(SETTINGS_FILE)
+        self._eol = get_end_of_line_character(self._request_view)
+        self._settings = self._get_settings()
 
-        # Store the current change count and run the request commands.
+        # Perform commands on the request.
+        # Store the number of changes made so we can undo them.
         changes = self._request_view.change_count()
         self._run_request_commands()
         changes = self._request_view.change_count() - changes
 
         # Read the selected text.
         text = self._get_selection()
-        self._eol = get_end_of_line_character(self._request_view)
 
         # Undo the request commands to return to the starting state.
         for i in range(changes):
@@ -92,9 +94,42 @@ class ResterHttpRequestCommand(sublime_plugin.WindowCommand):
         thread.start()
         self._handle_thread(thread)
 
-    def _normalize_command(self, command):
+    def _get_selection(self):
+        """Return the selected text or the entire buffer."""
+        view = self._request_view
+        sels = view.sel()
+        if len(sels) == 1 and sels[0].empty():
+            # No selection. Use the entire buffer.
+            selection = view.substr(sublime.Region(0, view.size()))
+        else:
+            # Concatenate the selections into one large string.
+            selection = ""
+            for sel in sels:
+                selection += view.substr(sel)
+        return selection
 
-        # Normalize the command to a dictionary.
+    def _get_settings(self):
+        """Return an OverrideableSettings object that combines the settings
+        with overrides read from the request."""
+
+        # Scan the request for overrides.
+        text = self._get_selection().lstrip()
+        text = normalize_line_endings(text, self._eol)
+        headers = text.split(self._eol * 2, 1)[0]
+
+        # Build a dictionary of the overrides.
+        overrides = {}
+        for (name, value) in re.findall(RE_OVERRIDE, headers, re.MULTILINE):
+            overrides[name] = json.loads(value)
+
+        # Return an OverrideableSettings object.
+        return OverrideableSettings(
+            settings=sublime.load_settings(SETTINGS_FILE),
+            overrides=overrides)
+
+    def _normalize_command(self, command):
+        """Return a well formed dictionary for a request or response command"""
+
         valid = False
         if isinstance(command, str):
             command = {"name": command}
@@ -124,26 +159,12 @@ class ResterHttpRequestCommand(sublime_plugin.WindowCommand):
             if command:
                 view.run_command(command["name"], command["args"])
 
-    def _run_response_commands(self, view, response, settings):
-        commands = settings.get("response_commands", [])
+    def _run_response_commands(self, view, response):
+        commands = self._settings.get("response_commands", [])
         for command in commands:
             command = self._normalize_command(command)
             if command:
                 view.run_command(command["name"], command["args"])
-
-    def _get_selection(self):
-        """Return the selected text or the entire buffer."""
-        view = self._request_view
-        sels = view.sel()
-        if len(sels) == 1 and sels[0].empty():
-            # No selection. Use the entire buffer.
-            selection = view.substr(sublime.Region(0, view.size()))
-        else:
-            # Concatenate the selections into one large string.
-            selection = ""
-            for sel in sels:
-                selection += view.substr(sel)
-        return selection
 
     def _handle_thread(self, thread, i=0, dir=1):
 
@@ -163,7 +184,7 @@ class ResterHttpRequestCommand(sublime_plugin.WindowCommand):
 
         elif isinstance(thread.result, http.client.HTTPResponse):
             # Success.
-            self._complete_thread(thread.result, thread.settings)
+            self._complete_thread(thread.result)
         elif isinstance(thread.result, str):
             # Failed.
             self._request_view.erase_status("rester")
@@ -199,12 +220,12 @@ class ResterHttpRequestCommand(sublime_plugin.WindowCommand):
             headers.append("%s: %s" % (key, value))
         return headers
 
-    def _read_body(self, response, settings):
+    def _read_body(self, response):
 
         # Decode the body from a list of bytes
         body_bytes = response.read()
         body_bytes = self._unzip_body(body_bytes, response)
-        body = self._decode_body(body_bytes, response, settings)
+        body = self._decode_body(body_bytes, response)
         body = normalize_line_endings(body, self._eol)
         return body
 
@@ -219,7 +240,7 @@ class ResterHttpRequestCommand(sublime_plugin.WindowCommand):
                 body_bytes = zlib.decompress(body_bytes, -15)
         return body_bytes
 
-    def _decode_body(self, body_bytes, response, settings):
+    def _decode_body(self, body_bytes, response):
 
         # Decode the body. The hard part here is finding the right encoding.
         # To do this, create a list of possible matches.
@@ -238,7 +259,8 @@ class ResterHttpRequestCommand(sublime_plugin.WindowCommand):
             encodings.append(encoding)
 
         # Add any default encodings not already discovered.
-        default_encodings = settings.get("default_response_encodings", [])
+        default_encodings = self._settings.get(
+            "default_response_encodings", [])
         for encoding in default_encodings:
             if encoding not in encodings:
                 encodings.append(encoding)
@@ -251,27 +273,25 @@ class ResterHttpRequestCommand(sublime_plugin.WindowCommand):
 
         return body
 
-    def _insert_and_select_response(self, view, response, settings, ):
+    def _insert_and_select_response(self, view, response):
 
         # Read headers and body.
         headers = self._read_headers(response)
-        body = self._read_body(response, settings)
+        body = self._read_body(response)
 
         start = 0
         end = 0
 
-        if settings.get("body_only") and 200 <= response.status <= 299:
-
+        if self._settings.get("body_only", False) and \
+                200 <= response.status <= 299:
             # Insert the body only, but only on success.
             view.run_command("insert", {"characters": body})
 
         else:
-
             # Insert the status line and headers. Store the file length.
             view.run_command("insert", {"characters": headers})
             view.run_command("insert", {"characters": (self._eol * 2)})
             start = view.size()
-
             # Insert the body.
             view.run_command("insert", {"characters": body})
 
@@ -283,16 +303,16 @@ class ResterHttpRequestCommand(sublime_plugin.WindowCommand):
             view.sel().clear()
             view.sel().add(selection)
 
-    def _complete_thread(self, response, settings):
+    def _complete_thread(self, response):
 
         # Create a new file.
         view = self.window.new_file()
 
         # Insert the response into the new file and select the body.
-        self._insert_and_select_response(view, response, settings)
+        self._insert_and_select_response(view, response)
 
         # Run commands on the selection.
-        self._run_response_commands(view, response, settings)
+        self._run_response_commands(view, response)
 
         # Scroll to the top.
         view.show(0)
@@ -322,7 +342,7 @@ class HttpRequestThread(threading.Thread):
         threading.Thread.__init__(self)
 
         # Store members and set defaults.
-        self.settings = OverrideableSettings(settings)
+        self._settings = settings
         self._eol = eol
         self._scheme = "http"
         self._hostname = None
@@ -331,24 +351,24 @@ class HttpRequestThread(threading.Thread):
         self._query = {}
         self._method = "GET"
         self._header_lines = []
-        self._headers = settings.get("default_headers", {})
+        self._headers = self._settings.get("default_headers", {})
         if not isinstance(self._headers, dict):
             self._headers = {}
         self._body = None
 
         # Parse the string to fill in the members with actual values.
-        self._parse_string(string)
+        self._parse_request(string)
 
     def run(self):
         """Method to run when the thread is started."""
 
         # Fail if the hostname is not set.
         if not self._hostname:
-            self.result = "Unable to make request: Please provide a hostname."
+            self.result = "Unable to make request. Please provide a hostname."
             return
 
         # Create the connection.
-        timeout = self.settings.get("timeout")
+        timeout = self._settings.get("timeout")
         conn = http.client.HTTPConnection(self._hostname,
                                           port=self._port,
                                           timeout=timeout)
@@ -371,7 +391,7 @@ class HttpRequestThread(threading.Thread):
             return
 
         # Output the request to the console.
-        if self.settings.get("output_request", True):
+        if self._settings.get("output_request", True):
             print(self._get_request_as_string())
 
         # Read the response.
@@ -400,14 +420,7 @@ class HttpRequestThread(threading.Thread):
         """Return a string representation of the request."""
 
         lines = []
-
-        # TODO Allow for HTTPS
-        protocol = "HTTP/1.1"
-
-        lines.append("%s %s %s" % (self._method,
-                                   self._get_requet_uri(),
-                                   protocol))
-
+        lines.append("%s %s HTTP/1.1" % (self._method, self._get_requet_uri()))
         for key in self._headers:
             lines.append("%s: %s" % (key, self._headers[key]))
 
@@ -418,7 +431,7 @@ class HttpRequestThread(threading.Thread):
 
         return string
 
-    def _parse_string(self, string):
+    def _parse_request(self, string):
         """Determine instance members from the contents of the string."""
 
         # Pre-parse clean-up.
@@ -502,30 +515,19 @@ class HttpRequestThread(threading.Thread):
             self._method = request_line["method"]
 
     def _parse_header_lines(self):
-        """Parse the lines before the body.
-
-        Build self._headers dictionary
-        Read the overrides for the settings
-
-        """
+        """Parse the lines before the body. Build self._headers dictionary"""
 
         headers = {}
-        overrides = {}
 
         for header in self._header_lines:
             header = header.lstrip()
 
-            # Comments begin with #
-            if header[0] == "#":
+            # Skip comments and overrides.
+            if header[0] in ("#", "@"):
                 pass
 
-            # Overrides begin with @
-            elif header[0] == "@" and ":" in header:
-                (key, value) = header[1:].split(":", 1)
-                overrides[key.strip()] = json.loads(value.strip())
-
             # Query parameters begin with ? or &
-            elif header[0] == "?" or header[0] == "&":
+            elif header[0] in ("?", "&"):
 
                 if "=" in header:
                     (key, value) = header[1:].split("=", 1)
@@ -547,11 +549,10 @@ class HttpRequestThread(threading.Thread):
                 (key, value) = header.split(":", 1)
                 headers[key] = value.strip()
 
+        # Merge headers with default headers provided in settings.
         if headers and self._headers:
             self._headers = dict(list(self._headers.items()) +
                                  list(headers.items()))
-
-        self.settings.set_overrides(overrides)
 
     def _read_request_line_dict(self, line):
         """Return a dicionary containing information about the request."""
