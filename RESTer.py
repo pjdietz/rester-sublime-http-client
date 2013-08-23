@@ -1,8 +1,10 @@
 import http.client
 import gzip
 import json
+import os
 import re
 import socket
+import tempfile
 import threading
 import urllib.parse
 import zlib
@@ -157,7 +159,7 @@ class ResterHttpRequestCommand(sublime_plugin.WindowCommand):
             if command:
                 view.run_command(command["name"], command["args"])
 
-    def _run_response_commands(self, view, response):
+    def _run_response_commands(self, view):
         commands = self._settings.get("response_commands", [])
         for command in commands:
             command = self._normalize_command(command)
@@ -191,13 +193,6 @@ class ResterHttpRequestCommand(sublime_plugin.WindowCommand):
             # Failed.
             self._request_view.erase_status("rester")
             sublime.status_message("Unable to make request.")
-
-    def _read_headers(self, response):
-        # Return a string of the status and headers.
-        status_line = self._read_status_line(response)
-        header_lines = self._read_header_lines(response)
-        headers = self._eol.join([status_line] + header_lines)
-        return headers
 
     def _read_status_line(self, response):
         # Build and return the status line (e.g., HTTP/1.1 200 OK)
@@ -268,53 +263,61 @@ class ResterHttpRequestCommand(sublime_plugin.WindowCommand):
 
         return body
 
-    def _insert_and_select_response(self, view, response):
-
-        # Read headers and body.
-        headers = self._read_headers(response)
-        body = self._read_body(response)
-
-        start = 0
-        end = 0
-
-        if self._settings.get("body_only", False) and \
-                200 <= response.status <= 299:
-            # Insert the body only, but only on success.
-            view.run_command("insert", {"characters": body})
-
-        else:
-            # Insert the status line and headers. Store the file length.
-            view.run_command("insert", {"characters": headers})
-            view.run_command("insert", {"characters": (self._eol * 2)})
-            start = view.size()
-            # Insert the body.
-            view.run_command("insert", {"characters": body})
-
-        end = view.size()
-
-        # Select the inserted response body.
-        if end > start:
-            selection = sublime.Region(start, end)
-            view.sel().clear()
-            view.sel().add(selection)
-
     def _complete_thread(self, response):
 
-        # Create a new file.
-        view = self.window.new_file()
+        # Open a temporary file to write the response to.
+        tmpfile = tempfile.NamedTemporaryFile("w", encoding="UTF8",
+                                              delete=False)
 
-        # Insert the response into the new file and select the body.
-        self._insert_and_select_response(view, response)
+        # Read headers and body.
+        status_line = self._read_status_line(response)
+        header_lines = self._read_header_lines(response)
+        headers = self._eol.join([status_line] + header_lines)
+        body = self._read_body(response)
 
-        # Run commands on the selection.
-        self._run_response_commands(view, response)
+        # Body only, but only on success.
+        if self._settings.get("body_only", False) and \
+                200 <= response.status <= 299:
+            tmpfile.write(body)
+            body_only = True
 
-        # Scroll to the top.
-        view.show(0)
+        # Status line and headers. Store the file length.
+        else:
+            tmpfile.write(headers)
+            tmpfile.write(self._eol * 2)
+            tmpfile.write(body)
+            body_only = False
 
-        # Write the status message.
-        self._request_view.erase_status("rester")
-        sublime.status_message("RESTer Request Complete")
+        # Close the file.
+        tmpfile.close()
+
+        # Start a new thread to open it asynchronously.
+        tmpfile_thread = OpenTempfileThread(self.window, tmpfile.name,
+                                            body_only, status_line)
+        tmpfile_thread.start()
+        self._handle_openfile_thread(tmpfile_thread)
+
+    def _handle_openfile_thread(self, thread, i=0, dir=1):
+
+        if thread.is_alive():
+            # This animates a little activity indicator in the status area.
+            before = i % 8
+            after = 7 - before
+            if not after:
+                dir = -1
+            if not before:
+                dir = 1
+            i += dir
+            message = "RESTer loading [%s=%s]" % (" " * before, " " * after)
+            self._request_view.set_status("rester", message)
+            sublime.set_timeout(lambda:
+                                self._handle_openfile_thread(thread, i, dir),
+                                100)
+
+        else:
+            self._run_response_commands(thread.view)
+            self._request_view.erase_status("rester")
+            sublime.status_message("RESTer Request Complete")
 
 
 class HttpRequestThread(threading.Thread):
@@ -573,6 +576,41 @@ class HttpRequestThread(threading.Thread):
             return m.groupdict()
 
         return None
+
+
+class OpenTempfileThread(threading.Thread):
+    """Thread sublcass for opening a tempfile and selecting the body"""
+
+    def __init__(self, window, filepath, body_only, status_line):
+        threading.Thread.__init__(self)
+        self.window = window
+        self.filepath = filepath
+        self.body_only = body_only
+        self.status_line = status_line
+
+    def run(self):
+
+        self.view = self.window.open_file(self.filepath, sublime.TRANSIENT)
+
+        # Block while loading.
+        while self.view.is_loading():
+            pass
+
+        self.view.set_name(self.status_line)
+
+        # Delete the temp file.
+        os.remove(self.filepath)
+
+        # Select the body.
+        if self.body_only:
+            selection = sublime.Region(0, self.view.size())
+        else:
+            eol = get_end_of_line_character(self.view)
+            headers = self.view.find(eol * 2, 0)
+            selection = sublime.Region(headers.b, self.view.size())
+
+        self.view.sel().clear()
+        self.view.sel().add(selection)
 
 
 class OverrideableSettings():
