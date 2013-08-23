@@ -28,6 +28,17 @@ Once you have a request ready, open the Command Palette (`Shift` + `Command` + `
 
 ## Installation
 
+### Sublime Package Control
+
+You can install RESTer using the excellent [Package Control][] package manager for Sublime Text:
+
+1. Open "Package Control: Install Package" from the Command Palette (`Shift` + `Command` + `P`).
+2. Select the "RESTer" option to install RESTer.
+
+[Package Control]: http://wbond.net/sublime_packages/package_control
+
+### Git Installation
+
 To install, clone to your "Packages" directory.
 
 ```
