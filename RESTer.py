@@ -95,7 +95,7 @@ class ResterHttpRequestCommand(sublime_plugin.WindowCommand):
         self._handle_thread(thread)
 
     def _get_selection(self):
-        """Return the selected text or the entire buffer."""
+        # Return the selected text or the entire buffer.
         view = self._request_view
         sels = view.sel()
         if len(sels) == 1 and sels[0].empty():
@@ -109,8 +109,6 @@ class ResterHttpRequestCommand(sublime_plugin.WindowCommand):
         return selection
 
     def _get_settings(self):
-        """Return an OverrideableSettings object that combines the settings
-        with overrides read from the request."""
 
         # Scan the request for overrides.
         text = self._get_selection().lstrip()
@@ -128,8 +126,8 @@ class ResterHttpRequestCommand(sublime_plugin.WindowCommand):
             overrides=overrides)
 
     def _normalize_command(self, command):
-        """Return a well formed dictionary for a request or response command"""
 
+        # Return a well formed dictionary for a request or response command
         valid = False
         if isinstance(command, str):
             command = {"name": command}
@@ -195,14 +193,13 @@ class ResterHttpRequestCommand(sublime_plugin.WindowCommand):
             sublime.status_message("Unable to make request.")
 
     def _read_headers(self, response):
-        """Read a string of the headers"""
+        # Return a string of the status and headers.
         status_line = self._read_status_line(response)
         header_lines = self._read_header_lines(response)
         headers = self._eol.join([status_line] + header_lines)
         return headers
 
     def _read_status_line(self, response):
-
         # Build and return the status line (e.g., HTTP/1.1 200 OK)
         protocol = "HTTP"
         if response.version == 11:
@@ -213,7 +210,6 @@ class ResterHttpRequestCommand(sublime_plugin.WindowCommand):
                                 response.reason)
 
     def _read_header_lines(self, response):
-
         # Build and return the header lines
         headers = []
         for (key, value) in response.getheaders():
@@ -221,7 +217,6 @@ class ResterHttpRequestCommand(sublime_plugin.WindowCommand):
         return headers
 
     def _read_body(self, response):
-
         # Decode the body from a list of bytes
         body_bytes = response.read()
         body_bytes = self._unzip_body(body_bytes, response)
@@ -406,7 +401,7 @@ class HttpRequestThread(threading.Thread):
         self.result = resp
 
     def _get_requet_uri(self):
-        """Return the path + query string for the request."""
+        # Return the path + query string for the request.
         uri = self._path
         if self._query:
             query = []
@@ -417,8 +412,8 @@ class HttpRequestThread(threading.Thread):
         return uri
 
     def _get_request_as_string(self):
-        """Return a string representation of the request."""
 
+        # Return a string representation of the request.
         lines = []
         lines.append("%s %s HTTP/1.1" % (self._method, self._get_requet_uri()))
         for key in self._headers:
@@ -432,7 +427,8 @@ class HttpRequestThread(threading.Thread):
         return string
 
     def _parse_request(self, string):
-        """Determine instance members from the contents of the string."""
+
+        # Determine instance members from the contents of the string.
 
         # Pre-parse clean-up.
         string = string.lstrip()
@@ -490,7 +486,6 @@ class HttpRequestThread(threading.Thread):
             self._path = uri.path
 
     def _parse_request_line(self, line):
-        """Parse the first line of the request"""
 
         # Parse the first line as the request line.
         # Fail, if unable to parse.
@@ -515,7 +510,8 @@ class HttpRequestThread(threading.Thread):
             self._method = request_line["method"]
 
     def _parse_header_lines(self):
-        """Parse the lines before the body. Build self._headers dictionary"""
+
+        # Parse the lines before the body. Build self._headers dictionary
 
         headers = {}
 
@@ -555,7 +551,8 @@ class HttpRequestThread(threading.Thread):
                                  list(headers.items()))
 
     def _read_request_line_dict(self, line):
-        """Return a dicionary containing information about the request."""
+
+        # Return a dicionary containing information about the request.
 
         # method-uri-protocol
         # Ex: GET /path HTTP/1.1
