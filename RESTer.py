@@ -182,17 +182,17 @@ class ResterHttpRequestCommand(sublime_plugin.WindowCommand):
             sublime.set_timeout(lambda:
                                 self._handle_thread(thread, i, dir), 100)
 
-        elif isinstance(thread.result, http.client.HTTPResponse):
+        elif thread.success:
             # Success.
-            self._complete_thread(thread.result)
-        elif isinstance(thread.result, str):
-            # Failed.
-            self._request_view.erase_status("rester")
-            sublime.status_message(thread.result)
+            self._complete_thread(thread)
+
         else:
             # Failed.
             self._request_view.erase_status("rester")
-            sublime.status_message("Unable to make request.")
+            if thread.message:
+                sublime.status_message(thread.message)
+            else:
+                sublime.status_message("Unable to make request.")
 
     def _read_status_line(self, response):
         # Build and return the status line (e.g., HTTP/1.1 200 OK)
@@ -211,11 +211,10 @@ class ResterHttpRequestCommand(sublime_plugin.WindowCommand):
             headers.append("%s: %s" % (key, value))
         return headers
 
-    def _read_body(self, response):
+    def _read_body(self, thread):
         # Decode the body from a list of bytes
-        body_bytes = response.read()
-        body_bytes = self._unzip_body(body_bytes, response)
-        body = self._decode_body(body_bytes, response)
+        body_bytes = self._unzip_body(thread.body, thread.response)
+        body = self._decode_body(body_bytes, thread.response)
         body = normalize_line_endings(body, self._eol)
         return body
 
@@ -263,21 +262,21 @@ class ResterHttpRequestCommand(sublime_plugin.WindowCommand):
 
         return body
 
-    def _complete_thread(self, response):
+    def _complete_thread(self, thread):
 
         # Open a temporary file to write the response to.
         tmpfile = tempfile.NamedTemporaryFile("w", encoding="UTF8",
                                               delete=False)
 
         # Read headers and body.
-        status_line = self._read_status_line(response)
-        header_lines = self._read_header_lines(response)
+        status_line = self._read_status_line(thread.response)
+        header_lines = self._read_header_lines(thread.response)
         headers = self._eol.join([status_line] + header_lines)
-        body = self._read_body(response)
+        body = self._read_body(thread)
 
         # Body only, but only on success.
         if self._settings.get("body_only", False) and \
-                200 <= response.status <= 299:
+                200 <= thread.response.status <= 299:
             tmpfile.write(body)
             body_only = True
 
@@ -378,13 +377,15 @@ class HttpRequestThread(threading.Thread):
                          body=self._body)
 
         except ConnectionRefusedError:
-            self.result = "Connection refused."
+            self.message = "Connection refused."
+            self.success = False
             conn.close()
             return
 
         except socket.gaierror:
-            self.result = "Unable to make request. "
-            self.result += "Make sure the hostname is valid."
+            self.message = "Unable to make request. "
+            self.message += "Make sure the hostname is valid."
+            self.success = False
             conn.close()
             return
 
@@ -396,12 +397,15 @@ class HttpRequestThread(threading.Thread):
         try:
             resp = conn.getresponse()
         except socket.timeout:
-            self.result = "Request timed out."
+            self.message = "Request timed out."
+            self.success = False
             conn.close()
             return
 
+        self.success = True
+        self.body = resp.read()
+        self.response = resp
         conn.close()
-        self.result = resp
 
     def _get_requet_uri(self):
         # Return the path + query string for the request.
