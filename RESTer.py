@@ -194,6 +194,40 @@ class ResterHttpRequestCommand(sublime_plugin.WindowCommand):
             else:
                 sublime.status_message("Unable to make request.")
 
+    def _complete_thread(self, thread):
+
+        # Open a temporary file to write the response to.
+        tmpfile = tempfile.NamedTemporaryFile("w", encoding="UTF8",
+                                              delete=False)
+
+        # Read headers and body.
+        status_line = self._read_status_line(thread.response)
+        header_lines = self._read_header_lines(thread.response)
+        headers = self._eol.join([status_line] + header_lines)
+        body = self._read_body(thread)
+
+        # Body only, but only on success.
+        if self._settings.get("body_only", False) and \
+                200 <= thread.response.status <= 299:
+            tmpfile.write(body)
+            body_only = True
+
+        # Status line and headers. Store the file length.
+        else:
+            tmpfile.write(headers)
+            tmpfile.write(self._eol * 2)
+            tmpfile.write(body)
+            body_only = False
+
+        # Close the file.
+        tmpfile.close()
+
+        # Start a new thread to open it asynchronously.
+        tmpfile_thread = OpenTempfileThread(self.window, tmpfile.name,
+                                            body_only, status_line)
+        tmpfile_thread.start()
+        self._handle_openfile_thread(tmpfile_thread)
+
     def _read_status_line(self, response):
         # Build and return the status line (e.g., HTTP/1.1 200 OK)
         protocol = "HTTP"
@@ -261,40 +295,6 @@ class ResterHttpRequestCommand(sublime_plugin.WindowCommand):
             body = "{Unable to decode body}"
 
         return body
-
-    def _complete_thread(self, thread):
-
-        # Open a temporary file to write the response to.
-        tmpfile = tempfile.NamedTemporaryFile("w", encoding="UTF8",
-                                              delete=False)
-
-        # Read headers and body.
-        status_line = self._read_status_line(thread.response)
-        header_lines = self._read_header_lines(thread.response)
-        headers = self._eol.join([status_line] + header_lines)
-        body = self._read_body(thread)
-
-        # Body only, but only on success.
-        if self._settings.get("body_only", False) and \
-                200 <= thread.response.status <= 299:
-            tmpfile.write(body)
-            body_only = True
-
-        # Status line and headers. Store the file length.
-        else:
-            tmpfile.write(headers)
-            tmpfile.write(self._eol * 2)
-            tmpfile.write(body)
-            body_only = False
-
-        # Close the file.
-        tmpfile.close()
-
-        # Start a new thread to open it asynchronously.
-        tmpfile_thread = OpenTempfileThread(self.window, tmpfile.name,
-                                            body_only, status_line)
-        tmpfile_thread.start()
-        self._handle_openfile_thread(tmpfile_thread)
 
     def _handle_openfile_thread(self, thread, i=0, dir=1):
 
