@@ -24,7 +24,7 @@ X-custom-header: whatever you want
 Here is the payload for the PUT request. Just add an empty line after the headers.
 ```
 
-Once you have a request ready, use shortcut `"ctrl+alt+r"` or open the Command Palette (`Shift` + `Command` + `P`) and enter `RESTer HTTP Request`.
+Once you have a request ready, use shortcut `Ctrl + Alt + r` or open the Command Palette (`Shift + Command + P`) and enter `RESTer HTTP Request`.
 
 ## Installation
 
@@ -32,7 +32,7 @@ Once you have a request ready, use shortcut `"ctrl+alt+r"` or open the Command P
 
 You can install RESTer using the excellent [Package Control][] package manager for Sublime Text:
 
-1. Open "Package Control: Install Package" from the Command Palette (`Shift` + `Command` + `P`).
+1. Open "Package Control: Install Package" from the Command Palette (`Shift + Command + P`).
 2. Select the "RESTer" option to install RESTer.
 
 [Package Control]: http://wbond.net/sublime_packages/package_control

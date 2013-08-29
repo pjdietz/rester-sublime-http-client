@@ -91,9 +91,14 @@ class ResterHttpRequestCommand(sublime_plugin.WindowCommand):
         for i in range(changes):
             self._request_view.run_command("undo")
 
+        # Determine the encoding of the editor starting the request.
+        # Sublime returns "Undefined" for views that are not yet saved.
+        encoding = self._request_view.encoding()
+        if encoding == "Undefined":
+            encoding = "UTF8"
+
         # Create, start, and handle a thread for the selection.
-        thread = HttpRequestThread(text, self._eol, self._settings,
-                                   self._request_view.encoding())
+        thread = HttpRequestThread(text, self._eol, self._settings, encoding)
         thread.start()
         self._handle_thread(thread)
 
