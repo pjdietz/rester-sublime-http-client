@@ -92,7 +92,8 @@ class ResterHttpRequestCommand(sublime_plugin.WindowCommand):
             self._request_view.run_command("undo")
 
         # Create, start, and handle a thread for the selection.
-        thread = HttpRequestThread(text, self._eol, self._settings)
+        thread = HttpRequestThread(text, self._eol, self._settings,
+                                   self._request_view.encoding())
         thread.start()
         self._handle_thread(thread)
 
@@ -322,7 +323,7 @@ class ResterHttpRequestCommand(sublime_plugin.WindowCommand):
 class HttpRequestThread(threading.Thread):
     """Thread sublcass for making an HTTP request given a string."""
 
-    def __init__(self, string, eol, settings):
+    def __init__(self, string, eol, settings, encoding):
         """Create a new request object
 
         @param string: The text of the request to perform, including headers,
@@ -352,6 +353,9 @@ class HttpRequestThread(threading.Thread):
         if not isinstance(self._headers, dict):
             self._headers = {}
         self._body = None
+        self._encoding = encoding
+        self.success = False
+        self.message = ""
 
         # Parse the string to fill in the members with actual values.
         self._parse_request(string)
@@ -369,12 +373,14 @@ class HttpRequestThread(threading.Thread):
         conn = http.client.HTTPConnection(self._hostname,
                                           port=self._port,
                                           timeout=timeout)
+        # Convert the body to bytes
+        body_bytes = self._body.encode(self._encoding)
 
         try:
             conn.request(self._method,
                          self._get_requet_uri(),
                          headers=self._headers,
-                         body=self._body)
+                         body=body_bytes)
 
         except ConnectionRefusedError:
             self.message = "Connection refused."
