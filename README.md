@@ -24,7 +24,7 @@ X-custom-header: whatever you want
 Here is the payload for the PUT request. Just add an empty line after the headers.
 ```
 
-Once you have a request ready, open the Command Palette (`Shift` + `Command` + `P`) and enter `RESTer HTTP Request`.
+Once you have a request ready, use shortcut `"ctrl+alt+r"` or open the Command Palette (`Shift` + `Command` + `P`) and enter `RESTer HTTP Request`.
 
 ## Installation
 
