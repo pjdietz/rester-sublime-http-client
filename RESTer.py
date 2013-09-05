@@ -94,7 +94,7 @@ class ResterHttpRequestCommand(sublime_plugin.WindowCommand):
         # Determine the encoding of the editor starting the request.
         # Sublime returns "Undefined" for views that are not yet saved.
         encoding = self._request_view.encoding()
-        if encoding == "Undefined":
+        if not encoding or encoding == "Undefined":
             encoding = "UTF8"
 
         # Create, start, and handle a thread for the selection.
@@ -379,7 +379,9 @@ class HttpRequestThread(threading.Thread):
                                           port=self._port,
                                           timeout=timeout)
         # Convert the body to bytes
-        body_bytes = self._body.encode(self._encoding)
+        body_bytes = None
+        if self._body:
+            body_bytes = self._body.encode(self._encoding)
 
         try:
             conn.request(self._method,
