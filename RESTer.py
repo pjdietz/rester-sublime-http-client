@@ -32,6 +32,17 @@ def get_end_of_line_character(view):
         return "\n"
 
 
+def get_query_string(query_map):
+    # Return the query string given a map of key-value pairs.
+    if query_map:
+        query = []
+        for (name, values) in query_map.items():
+            for value in values:
+                query.append(name + "=" + value)
+        return "&".join(query)
+    return None
+
+
 def normalize_line_endings(string, eol):
     """Return a string with consistent line endings."""
     string = string.replace("\r\n", "\n").replace("\r", "\n")
@@ -424,11 +435,7 @@ class HttpRequestThread(threading.Thread):
         # Return the path + query string for the request.
         uri = self._path
         if self._query:
-            query = []
-            for (name, values) in self._query.items():
-                for value in values:
-                    query.append(name + "=" + value)
-            uri += "?" + "&".join(query)
+            uri += "?" + get_query_string(self._query)
         return uri
 
     def _get_request_as_string(self):
@@ -628,6 +635,74 @@ class OpenTempfileThread(threading.Thread):
 
         self.view.sel().clear()
         self.view.sel().add(selection)
+
+
+class AutoFormEncodeCommand(sublime_plugin.TextCommand):
+    """Encode a request as x-www-form-urlencoded"""
+
+    def run(self, edit):
+        self._edit = edit
+        # Replace the text in each selection.
+        for selection in self._get_selections():
+            self._replace_text(selection)
+
+    def _get_selections(self):
+        # Return a list or Regions for the selection(s).
+        sels = self.view.sel()
+        if len(sels) == 1 and sels[0].empty():
+            return [sublime.Region(0, self.view.size())]
+        else:
+            return sels
+
+    def _replace_text(self, selection):
+        # Replace the selected text with the new version.
+
+        text = self.view.substr(selection)
+        eol = get_end_of_line_character(self.view)
+
+        # Quit if there's not body to encode.
+        if (eol * 2) not in text:
+            return
+
+        (headers, body) = text.split(eol * 2)
+        if self._has_form_encoded_header(headers.split(eol)):
+            encoded_body = self._get_encoded_body(body.split(eol))
+            request = headers + eol + eol + encoded_body
+            self.view.replace(self._edit, selection, request)
+
+    def _has_form_encoded_header(self, header_lines):
+        for line in header_lines:
+            if ":" in line:
+                (header, value) = line.split(":", 1)
+                if header.lower() == "content-type" \
+                        and "x-www-form-urlencoded" in value:
+                    return True
+        return False
+
+    def _get_encoded_body(self, body_lines):
+        # return the form-urlencoded version of the body.
+
+        form = {}
+
+        for line in body_lines:
+            line = line.strip()
+
+            if "=" in line:
+                (key, value) = line.split("=", 1)
+            elif ":" in line:
+                (key, value) = line.split(":", 1)
+            else:
+                key, value = None, None
+
+            if key and value:
+                key = key.strip()
+                value = urllib.parse.quote(value.strip())
+                if key in form:
+                    form[key].append(value)
+                else:
+                    form[key] = [value]
+
+        return get_query_string(form)
 
 
 class OverrideableSettings():

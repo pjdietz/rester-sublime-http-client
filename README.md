@@ -78,13 +78,9 @@ Because GET is the default method, each of these will have the same effect.
 
 RESTer parses the lines immediately following the first non-empty line up to the first empty line as headers. Use the standard `field-name: field-value` format.
 
-### Body
-
-To supply a message body for POST and PUT requests, add an empty line after the last header. RESTer will treat all content that follows the blank line as the request body.
-
 ### Query Parameters
 
-For requests with many query parameters, you may want to spread your request across a number of lines. RESTer will parse any lines before the body that begin with `?` or `&` as query parameters. You may use `=` or `:` to separate the key from the value.
+For requests with many query parameters, you may want to spread your request across a number of lines. RESTer will parse any lines in the headers section that begin with `?` or `&` as query parameters. You may use `=` or `:` to separate the key from the value.
 
 The following example requests are equivalent:
 
@@ -120,6 +116,39 @@ http://api.mysite.com/?item=I520like%20spaces
 ```
 http://api.mysite.com/
     ? item: I like spaces
+```
+
+
+### Body
+
+To supply a message body for POST and PUT requests, add an empty line after the last header. RESTer will treat all content that follows the blank line as the request body.
+
+#### Form Encoding
+
+For `application/x-www-form-urlencoded` requests, you can use the `auto_form_encode` command (part of RESTer) to automatically encode a body of key-value pairs. To use this functionality, make sure that `auto_form_encode` is enabled as a [`request_command`](#request-commands) and include a `Content-type: application/x-www-form-urlencoded` header.
+
+The key-value pairs must be on separate lines. You may use `=` or `:` to separate the key from the value. As with query parameters, whitespace around the key and value is ignored.
+
+Example
+
+```
+POST http://api.mysite.com/cats/
+Content-type: application/x-www-form-urlencoded
+
+name=Molly
+color=Calico
+nickname=Mrs. Puff
+```
+
+Colons and whitespace
+
+```
+POST http://api.mysite.com/cats/
+Content-type: application/x-www-form-urlencoded
+
+      name: Molly
+     color: Calico
+  nickname: Mrs. Puff
 ```
 
 ### Comments

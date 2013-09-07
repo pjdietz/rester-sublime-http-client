@@ -16,7 +16,10 @@
 
     // List of commands to run on the request.
     // These commands will be undone after the request is issued.
-    "request_commands": ["merge_variables"],
+    "request_commands": [
+        "auto_form_encode",
+        "merge_variables"
+    ],
 
     // Commands to run on the body of the resonse.
     "response_commands": ["prettyjson"],
