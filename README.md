@@ -187,8 +187,8 @@ Setting                 | Default | Description
 ----------------------- | ------- | -----------
 output_request          | `true`  | Write the request to the console.
 output_response_headers | `true`  | Write the status line and headers to the console.
-output_response_body    | `true`  | Write the body of response to the console. **Note**: because [response commands](##response-commands) must by run in a buffer, the body is not processed.
-response_buffer         | `true`  | Open a new buffer, write the response, and run any number of [response commands](##response-commands) on the response body.
+output_response_body    | `true`  | Write the body of response to the console. **Note**: because [response commands](#response-commands) must by run in a buffer, the body is not processed.
+response_buffer         | `true`  | Open a new buffer, write the response, and run any number of [response commands](#response-commands) on the response body.
 body_only               | `false` | When writing the response to the buffer, do not include headers.
 
 ### Default Headers
