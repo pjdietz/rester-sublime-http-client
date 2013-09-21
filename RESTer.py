@@ -213,15 +213,31 @@ class ResterHttpRequestCommand(sublime_plugin.WindowCommand):
 
     def _complete_thread(self, thread):
 
-        # Open a temporary file to write the response to.
-        tmpfile = tempfile.NamedTemporaryFile("w", encoding="UTF8",
-                                              delete=False)
-
         # Read headers and body.
         status_line = self._read_status_line(thread.response)
         header_lines = self._read_header_lines(thread.response)
         headers = self._eol.join([status_line] + header_lines)
         body = self._read_body(thread)
+
+        # Output the response to the console.
+        output_headers = self._settings.get("output_response_headers", True)
+        output_body = self._settings.get("output_response_body", True)
+        if output_headers or output_body:
+            print("[Response]")
+            if output_headers:
+                print(headers)
+            if output_headers and output_body:
+                print()
+            if output_body:
+                print(body)
+
+        # Stop now if the user does not want a response buffer.
+        if not self._settings.get("response_buffer", True):
+            return
+
+        # Open a temporary file to write the response to.
+        tmpfile = tempfile.NamedTemporaryFile("w", encoding="UTF8",
+                                              delete=False)
 
         # Body only, but only on success.
         if self._settings.get("body_only", False) and \
@@ -415,6 +431,7 @@ class HttpRequestThread(threading.Thread):
 
         # Output the request to the console.
         if self._settings.get("output_request", True):
+            print("[Request]")
             print(self._get_request_as_string())
 
         # Read the response.

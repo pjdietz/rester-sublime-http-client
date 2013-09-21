@@ -179,6 +179,18 @@ Host: /api.my-site.com
 
 RESTer has some other features that you can customize through settings. To customize, add the desired key to the user settings file or add a per-request setting using an `@` line as described above.
 
+### Displaying the Response and Request
+
+By default, RESTer outputs the request and response to the console and opens a new buffer where it writes the full contents of the response. You can change this behavior by tweaking several settings.
+
+Setting                 | Default | Description
+----------------------- | ------- | -----------
+output_request          | `true`  | Write the request to the console.
+output_response_headers | `true`  | Write the status line and headers to the console.
+output_response_body    | `true`  | Write the body of response to the console. **Note**: because [response commands](##response-commands) must by run in a buffer, the body is not processed.
+response_buffer         | `true`  | Open a new buffer, write the response, and run any number of [response commands](##response-commands) on the response body.
+body_only               | `false` | When writing the response to the buffer, do not include headers.
+
 ### Default Headers
 
 To include a set of headers with each request, add them to the `"default_headers"` setting. This is a dictionary with the header names as the keys.
