@@ -9,14 +9,14 @@ RESTer allows you to build an HTTP request in Sublime Text 3 and view the respon
 A request can be as simple as a URI:
 
 ```
-http://www.mysite.com
+http://api.my-example-site.com
 ```
 
 Or, you can send headers and a body:
 
 ```
 PUT /my-endpoint HTTP/1.1
-Host: api.my-site.com
+Host: api.my-example-site.com
 Accept: text/plain
 Accept-Charset: utf-8
 X-custom-header: whatever you want
@@ -57,19 +57,19 @@ Here are some example request lines:
 
 ```
 GET /my-endpoint HTTP/1.1
-Host: api.my-site.com
+Host: api.my-example-site.com
 ```
 
 ```
-GET http://api.my-site.com/my-endpoint
+GET http://api.my-example-site.com/my-endpoint
 ```
 
 ```
-http://api.my-site.com/my-endpoint
+http://api.my-example-site.com/my-endpoint
 ```
 
 ```
-api.my-site.com/my-endpoint
+api.my-example-site.com/my-endpoint
 ```
 
 Because GET is the default method, each of these will have the same effect.
@@ -86,19 +86,19 @@ The following example requests are equivalent:
 
 All in the URI
 ```
-http://api.mysite.com/?cat=molly&dog=bear
+http://api.my-example-site.com/?cat=molly&dog=bear
 ```
 
 With new lines
 ```
-http://api.mysite.com/
+http://api.my-example-site.com/
 ?cat=molly
 &dog=bear
 ```
 
 Indented, using colons, and only using ?
 ```
-http://api.mysite.com/
+http://api.my-example-site.com/
     ? cat: molly
     ? dog: bear
 ```
@@ -110,11 +110,11 @@ One thing to note is that RESTer assumes that anything you place directly in the
 These requests are equivalent:
 
 ```
-http://api.mysite.com/?item=I520like%20spaces
+http://api.my-example-site.com/?item=I520like%20spaces
 ```
 
 ```
-http://api.mysite.com/
+http://api.my-example-site.com/
     ? item: I like spaces
 ```
 
@@ -123,16 +123,28 @@ http://api.mysite.com/
 
 To supply a message body for POST and PUT requests, add an empty line after the last header. RESTer will treat all content that follows the blank line as the request body.
 
+Here's an example of adding a new cat representation by supplying JSON:
+
+```
+POST http://api.my-example-site.com/cats/
+
+{
+    "name": "Molly",
+    "color": "Calico",
+    "nickname": "Mrs. Puff"
+}
+```
+
 #### Form Encoding
 
 For `application/x-www-form-urlencoded` requests, you can use the `auto_form_encode` command (part of RESTer) to automatically encode a body of key-value pairs. To use this functionality, make sure that `auto_form_encode` is enabled as a [`request_command`](#request-commands) and include a `Content-type: application/x-www-form-urlencoded` header.
 
 The key-value pairs must be on separate lines. You may use `=` or `:` to separate the key from the value. As with query parameters, whitespace around the key and value is ignored.
 
-Example
+Example:
 
 ```
-POST http://api.mysite.com/cats/
+POST http://api.my-example-site.com/cats/
 Content-type: application/x-www-form-urlencoded
 
 name=Molly
@@ -143,7 +155,7 @@ nickname=Mrs. Puff
 Colons and whitespace
 
 ```
-POST http://api.mysite.com/cats/
+POST http://api.my-example-site.com/cats/
 Content-type: application/x-www-form-urlencoded
 
       name: Molly
@@ -157,12 +169,14 @@ You may include comments in your request by adding lines in the headers section 
 
 ```
 GET /my-endpoint HTTP/1.1
-Host: /api.my-site.com
+Host: /api.my-example-site.com
 # This is a comment.
 Cache-control: no-cache
 ```
 
-### Per-request Settings
+## Settings
+
+RESTer has some other features that you can customize through settings. To customize, add the desired key to the user settings file.
 
 You may also provide configuration settings for the current request by adding lines to the headers section that begin with `@`.
 
@@ -170,14 +184,10 @@ The format of the line is `@{name}: {value}` where `{name}` is the key for a set
 
 ```
 GET /my-endpoint HTTP/1.1
-Host: /api.my-site.com
+Host: /api.my-example-site.com
 @timeout: 2
 @default_response_encodings: ["utf-8", "ISO-8859-1", "ascii"]
 ```
-
-## Settings
-
-RESTer has some other features that you can customize through settings. To customize, add the desired key to the user settings file or add a per-request setting using an `@` line as described above.
 
 ### Displaying the Response and Request
 
@@ -190,6 +200,34 @@ output_response_headers | `true`  | Write the status line and headers to the con
 output_response_body    | `true`  | Write the body of response to the console. **Note**: because [response commands](#response-commands) must by run in a buffer, the body is not processed.
 response_buffer         | `true`  | Open a new buffer, write the response, and run any number of [response commands](#response-commands) on the response body.
 body_only               | `false` | When writing the response to the buffer, do not include headers.
+
+### Protocol
+
+As of version 1.3.0, RESTer supports making HTTP and HTTPS requests. To use HTTPS, you can include the protocol in the request line. You can also set a default protocol in the settings.
+
+```json
+{
+    "protocol": "https"
+}
+```
+
+You may also set the protocol using an override. These requests are equivalent:
+
+```
+GET https://api.my-secure-example-site.com/my-endpoint
+```
+
+```
+GET /my-endpoint
+Host: api.my-secure-example-site.com
+@protocol:https
+```
+
+**Note:** HTTPS support is only available if Python was compiled with SSL support (through the ssl module).
+
+### Port
+
+RESTer will assume ports 80 and 443 for HTTP and HTTPS respectively. If you ofter require a specific custom port, you can set it in the settings.
 
 ### Default Headers
 
@@ -254,13 +292,13 @@ GET http://{{API}}/my-endpoint
 For a development configuration, this could expand to:
 
 ```
-GET http://dev.my-cool-site.com/my-endpoint
+GET http://dev.my-example-site.com/my-endpoint
 ```
 
 And for a production configuration:
 
 ```
-GET http://api.my-cool-site.com/my-endpoint
+GET http://api.my-example-site.com/my-endpoint
 ```
 
 See [Merge Variables](https://github.com/pjdietz/sublime-merge-variables) for more information.
@@ -277,10 +315,6 @@ Most of the time, you'll only need to supply the name for a command. Some comman
     }
 }
 ```
-
-## Limitations
-
-I have not yet added support for authentication or HTTPS.
 
 ## Author
 
