@@ -137,7 +137,11 @@ class ResterHttpRequestCommand(sublime_plugin.WindowCommand):
         # Build a dictionary of the overrides.
         overrides = {}
         for (name, value) in re.findall(RE_OVERRIDE, headers, re.MULTILINE):
-            overrides[name] = json.loads(value)
+            try:
+                overrides[name] = json.loads(value)
+            except ValueError:
+                # If unable to parse as JSON, assume it's an un-quoted string.
+                overrides[name] = value
 
         # Return an OverrideableSettings object.
         return OverrideableSettings(
@@ -353,6 +357,7 @@ class ResterHttpRequestCommand(sublime_plugin.WindowCommand):
 
 
 class HttpRequestThread(threading.Thread):
+
     """Thread sublcass for making an HTTP request given a string."""
 
     def __init__(self, string, eol, settings, encoding):
@@ -374,10 +379,10 @@ class HttpRequestThread(threading.Thread):
         # Store members and set defaults.
         self._settings = settings
         self._eol = eol
-        self._scheme = "http"
         self._hostname = None
         self._path = None
-        self._port = 80
+        self._port = self._settings.get("port", None)
+        self._protocol = self._settings.get("protocol", "http")
         self._query = {}
         self._method = "GET"
         self._header_lines = []
@@ -400,11 +405,18 @@ class HttpRequestThread(threading.Thread):
             self.result = "Unable to make request. Please provide a hostname."
             return
 
+        # Determine the class to use for the connection.
+        if self._protocol == "https":
+            connection_class = http.client.HTTPSConnection
+        else:
+            connection_class = http.client.HTTPConnection
+
         # Create the connection.
         timeout = self._settings.get("timeout")
-        conn = http.client.HTTPConnection(self._hostname,
-                                          port=self._port,
-                                          timeout=timeout)
+        conn = connection_class(self._hostname,
+                                port=self._port,
+                                timeout=timeout)
+
         # Convert the body to bytes
         body_bytes = None
         if self._body:
@@ -439,6 +451,11 @@ class HttpRequestThread(threading.Thread):
             resp = conn.getresponse()
         except socket.timeout:
             self.message = "Request timed out."
+            self.success = False
+            conn.close()
+            return
+        except:
+            self.message = "Unexpected error making request."
             self.success = False
             conn.close()
             return
@@ -494,7 +511,7 @@ class HttpRequestThread(threading.Thread):
 
         if has_body:
             self._header_lines = lines[1:i]
-            self._body = self._eol.join(lines[i+1:])
+            self._body = self._eol.join(lines[i + 1:])
         else:
             self._header_lines = lines[1:]
 
@@ -541,11 +558,11 @@ class HttpRequestThread(threading.Thread):
         uri = urllib.parse.urlparse(request_line["uri"])
 
         # Copy from the parsed URI.
-        if uri.scheme:
-            self._scheme = uri.scheme
         self._hostname = uri.hostname
         self._path = uri.path
         self._query = urllib.parse.parse_qs(uri.query)
+        if uri.scheme:
+            self._protocol = uri.scheme
         if uri.port:
             self._port = uri.port
 
@@ -600,13 +617,13 @@ class HttpRequestThread(threading.Thread):
 
         # method-uri-protocol
         # Ex: GET /path HTTP/1.1
-        m = re.search(RE_METHOD + " " + RE_URI + " " + RE_PROTOCOL, line)
+        m = re.search(RE_METHOD + "\s+" + RE_URI + "\s+" + RE_PROTOCOL, line)
         if m:
             return m.groupdict()
 
         # method-uri
         # Ex: GET /path HTTP/1.1
-        m = re.search(RE_METHOD + " " + RE_URI, line)
+        m = re.search(RE_METHOD + "\s+" + RE_URI, line)
         if m:
             return m.groupdict()
 
@@ -620,6 +637,7 @@ class HttpRequestThread(threading.Thread):
 
 
 class OpenTempfileThread(threading.Thread):
+
     """Thread sublcass for opening a tempfile and selecting the body"""
 
     def __init__(self, window, filepath, body_only, status_line):
@@ -655,6 +673,7 @@ class OpenTempfileThread(threading.Thread):
 
 
 class AutoFormEncodeCommand(sublime_plugin.TextCommand):
+
     """Encode a request as x-www-form-urlencoded"""
 
     def run(self, edit):
@@ -723,6 +742,7 @@ class AutoFormEncodeCommand(sublime_plugin.TextCommand):
 
 
 class OverrideableSettings():
+
     """
     Class for adding a layer of overrides on top of a Settings object
 

@@ -20,6 +20,14 @@
     // Output the response body to the console.
     "output_response_body": true,
 
+    // Port to use when not listed in the request line.
+    // Do not set unless you need something other than 80 (http) or 443 (https)
+    "port": null,
+
+    // Protocol to use when not listed in the request line.
+    // Allowed values are "http" and "https"
+    "protocol": "http",
+
     // List of commands to run on the request.
     // These commands will be undone after the request is issued.
     "request_commands": [
