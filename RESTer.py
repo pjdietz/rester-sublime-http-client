@@ -700,7 +700,7 @@ class AutoFormEncodeCommand(sublime_plugin.TextCommand):
         if (eol * 2) not in text:
             return
 
-        (headers, body) = text.split(eol * 2)
+        (headers, body) = text.split(eol * 2, 1)
         if self._has_form_encoded_header(headers.split(eol)):
             encoded_body = self._get_encoded_body(body.split(eol))
             request = headers + eol + eol + encoded_body
