@@ -3,6 +3,12 @@ Utility functions
 """
 
 
+import re
+
+
+RE_ENCODING = """(?:encoding|charset)=['"]*([a-zA-Z0-9\-]+)['"]*"""
+
+
 def get_end_of_line_character(view):
     """Return the EOL character from the view's settings."""
     line_endings = view.settings().get("default_line_ending")
@@ -31,3 +37,20 @@ def normalize_line_endings(string, eol):
     if eol != "\n":
         string = string.replace("\n", eol)
     return string
+
+
+def scan_string_for_encoding(string):
+    """Read a string and return the encoding identified within."""
+    m = re.search(RE_ENCODING, string)
+    if m:
+        return m.groups()[0]
+    return None
+
+
+def scan_bytes_for_encoding(bytes):
+    """Read a byte sequence and return the encoding identified within."""
+    m = re.search(RE_ENCODING.encode('ascii'), bytes)
+    if m:
+        encoding = m.groups()[0]
+        return encoding.decode('ascii')
+    return None
