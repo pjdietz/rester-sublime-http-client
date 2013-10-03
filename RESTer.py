@@ -1,5 +1,7 @@
 import json
+import os
 import re
+import tempfile
 
 import sublime
 import sublime_plugin
@@ -136,12 +138,100 @@ class ResterHttpRequestCommand(sublime_plugin.WindowCommand):
 
         response_parser = parse.ResponseParser(self.settings, self.eol)
         response = response_parser.get_response(thread.response, thread.body)
+        status_line = response.get_status_line()
 
-        print(response)
+        # Output the response to the console.
+        output_headers = self.settings.get("output_response_headers", True)
+        output_body = self.settings.get("output_response_body", True)
+        if output_headers or output_body:
+            print("[Response]")
+            if output_headers and output_body:
+                print(response)
+            elif output_headers:
+                print(status_line)
+                print("\n".join(response.headers))
+            elif output_body:
+                print(reponse.body)
 
+        # Stop now if the user does not want a response buffer.
+        if not self.settings.get("response_buffer", True):
+            # Done message.
+            self.request_view.erase_status("rester")
+            message = "Request complete. " + status_line
+            sublime.status_message(message)
+            return
 
+        # Open a temporary file to write the response to.
+        tmpfile = tempfile.NamedTemporaryFile("w", delete=False)
 
+        # Body only, but only on success.
+        if self.settings.get("body_only", False) and \
+                200 <= thread.response.status <= 299:
+            tmpfile.write(body)
+            body_only = True
 
+        # Status line and headers. Store the file length.
+        else:
+            tmpfile.write(status_line)
+            tmpfile.write(self.eol.join(response.headers))
+            tmpfile.write(self.eol * 2)
+            tmpfile.write(response.body)
+            body_only = False
+
+        # Close the file.
+        tmpfile.close()
+        filepath = tmpfile.name
+
+        # Open the file in a new view.
+        self.response_view = self.window.open_file(filepath, sublime.TRANSIENT)
+        self._handle_response_view(tmpfile.name, status_line, body_only)
+
+    def _handle_response_view(self, filepath, status_line, body_only,
+                              i=0, dir=1):
+
+        if self.response_view.is_loading():
+
+            # This animates a little activity indicator in the status area.
+            before = i % 8
+            after = 7 - before
+            if not after:
+                dir = -1
+            if not before:
+                dir = 1
+            i += dir
+            message = "RESTer loading [%s=%s]" % (" " * before, " " * after)
+            self.request_view.set_status("rester", message)
+
+            fn = lambda: self._handle_response_view(filepath, status_line,
+                                                    body_only, i, dir)
+            sublime.set_timeout(fn, 100)
+
+        else:
+
+            view = self.response_view
+            view.set_name(status_line)
+
+            # Delete the temp file.
+            os.remove(filepath)
+
+            # Select the body.
+            if body_only:
+                selection = sublime.Region(0, view.size())
+            else:
+                eol = util.get_end_of_line_character(view)
+                headers = view.find(eol * 2, 0)
+                selection = sublime.Region(headers.b, view.size())
+
+            view.sel().clear()
+            view.sel().add(selection)
+
+            # Run response commands and finish.
+            self._run_response_commands()
+
+            # Done message.
+            self.request_view.erase_status("rester")
+            message = "Request complete. " + status_line
+            sublime.status_message(message)
 
     def _normalize_command(self, command):
 
@@ -179,6 +269,14 @@ class ResterHttpRequestCommand(sublime_plugin.WindowCommand):
     def _run_request_commands(self):
         view = self.request_view
         commands = self.settings.get("request_commands", [])
+        for command in commands:
+            command = self._normalize_command(command)
+            if command:
+                view.run_command(command["name"], command["args"])
+
+    def _run_response_commands(self):
+        view = self.response_view
+        commands = self.settings.get("response_commands", [])
         for command in commands:
             command = self._normalize_command(command)
             if command:
