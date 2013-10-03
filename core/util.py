@@ -2,6 +2,7 @@
 Utility functions
 """
 
+
 def get_end_of_line_character(view):
     """Return the EOL character from the view's settings."""
     line_endings = view.settings().get("default_line_ending")
@@ -12,8 +13,9 @@ def get_end_of_line_character(view):
     else:
         return "\n"
 
+
 def get_query_string(query_map):
-    # Return the query string given a map of key-value pairs.
+    """Return the query string given a map of key-value pairs."""
     if query_map:
         query = []
         for (name, values) in query_map.items():
@@ -21,6 +23,7 @@ def get_query_string(query_map):
                 query.append(name + "=" + value)
         return "&".join(query)
     return None
+
 
 def normalize_line_endings(string, eol):
     """Return a string with consistent line endings."""

@@ -7,21 +7,24 @@ import sublime_plugin
 try:
     # Sublime Text 3
     from RESTer.common.overrideable import OverrideableSettings
-    from RESTer.core.message import Request
+    from RESTer.core import message
     from RESTer.core import constants
     from RESTer.core import util
+    from RESTer.core.parse import RequestParser
     ST3 = True
     ST2 = False
 except ImportError:
     # Sublime Text 2
     from common.overrideable import OverrideableSettings
-    from core.message import Request
+    from core import message
     from core import constants
     from core import util
+    from core.parse import RequestParser
     ST3 = False
     ST2 = True
 
-class HttpRequestCommand(sublime_plugin.WindowCommand):
+
+class ResterHttpRequestCommand(sublime_plugin.WindowCommand):
 
     def run(self):
 
@@ -57,8 +60,13 @@ class HttpRequestCommand(sublime_plugin.WindowCommand):
         if not encoding or encoding == "Undefined":
             encoding = "UTF-8"
 
-        print(text)
-        print(encoding)
+        request_parser = RequestParser(self.settings, self.eol)
+        rqst = request_parser.get_request(text, encoding)
+        print("Method:", rqst.method)
+        print("Host:", rqst.host)
+        print("Path:", rqst.path)
+        print("Headers:", rqst.headers)
+        print("Body:", rqst.body)
 
     def _get_selection(self):
         # Return the selected text or the entire buffer.

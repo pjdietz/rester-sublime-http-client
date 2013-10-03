@@ -9,6 +9,7 @@ except ImportError:
     from core import util
     from urllib import quote
 
+
 class AutoFormEncodeCommand(sublime_plugin.TextCommand):
 
     """Encode a request as x-www-form-urlencoded"""
@@ -32,8 +33,6 @@ class AutoFormEncodeCommand(sublime_plugin.TextCommand):
 
         text = self.view.substr(selection)
         eol = util.get_end_of_line_character(self.view)
-
-        print(text)
 
         # Quit if there's not body to encode.
         if (eol * 2) not in text:
