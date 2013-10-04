@@ -44,6 +44,8 @@ class ResterHttpRequestCommand(sublime_plugin.WindowCommand):
         self.eol = util.get_end_of_line_character(self.request_view)
         self.settings = self._get_settings()
         self.redirect_count = 0
+        self._requesting = False
+        self._completed_message = "Done."
 
         # Determine the encoding of the editor starting the request.
         # Sublime returns "Undefined" for views that are not yet saved.
@@ -77,7 +79,13 @@ class ResterHttpRequestCommand(sublime_plugin.WindowCommand):
         request = request_parser.get_request(text, self.encoding)
 
         # Make the request.
+        self._requesting = True
+        self._check_if_requesting()
         self._start_request(request)
+
+    def _complete(self, message):
+        self._requesting = False
+        self._completed_message = message
 
     def _get_selection(self):
         # Return the selected text or the entire buffer.
@@ -119,7 +127,7 @@ class ResterHttpRequestCommand(sublime_plugin.WindowCommand):
 
         # Output the request to the console.
         if self.settings.get("output_request", True):
-            print("[Request]")
+            print("\n[Request]")
             print(request)
 
         # Create, start, and handle a thread for the selection.
@@ -127,9 +135,8 @@ class ResterHttpRequestCommand(sublime_plugin.WindowCommand):
         thread.start()
         self._handle_thread(thread)
 
-    def _handle_thread(self, thread, i=0, dir=1):
-
-        if thread.is_alive():
+    def _check_if_requesting(self, i=0, dir=1):
+        if self._requesting:
             # This animates a little activity indicator in the status area.
             before = i % 8
             after = 7 - before
@@ -140,8 +147,17 @@ class ResterHttpRequestCommand(sublime_plugin.WindowCommand):
             i += dir
             message = "RESTer [%s=%s]" % (" " * before, " " * after)
             self.request_view.set_status("rester", message)
-            sublime.set_timeout(lambda:
-                                self._handle_thread(thread, i, dir), 100)
+            sublime.set_timeout(lambda: self._check_if_requesting(i, dir), 100)
+        else:
+            if not self._completed_message:
+                self._completed_message = "Done."
+            self.request_view.set_status("rester", self._completed_message)
+
+    def _handle_thread(self, thread):
+
+        if thread.is_alive():
+            # Working...
+            sublime.set_timeout(lambda: self._handle_thread(thread), 100)
 
         elif thread.success:
             # Success.
@@ -149,11 +165,10 @@ class ResterHttpRequestCommand(sublime_plugin.WindowCommand):
 
         else:
             # Failed.
-            self.request_view.erase_status("rester")
             if thread.message:
-                sublime.status_message(thread.message)
+                self._complete(thread.message)
             else:
-                sublime.status_message("Unable to make request.")
+                self._complete("Unable to make request.")
 
     def _complete_thread(self, thread):
 
@@ -164,7 +179,7 @@ class ResterHttpRequestCommand(sublime_plugin.WindowCommand):
         output_headers = self.settings.get("output_response_headers", True)
         output_body = self.settings.get("output_response_body", True)
         if output_headers or output_body:
-            print("[Response]")
+            print("\n[Response]")
             if output_headers and output_body:
                 print(response)
             elif output_headers:
@@ -182,27 +197,26 @@ class ResterHttpRequestCommand(sublime_plugin.WindowCommand):
 
         # Stop now if the user does not want a response buffer.
         if not self.settings.get("response_buffer", True):
-            # Done message.
-            self.request_view.erase_status("rester")
-            message = "Request complete. " + status_line
-            sublime.status_message(message)
+            self._complete("Request complete. " + status_line)
             return
 
         # Open a temporary file to write the response to.
         tmpfile = tempfile.NamedTemporaryFile("w", delete=False)
 
         # Body only, but only on success.
-        if self.settings.get("body_only", False) and \
-                200 <= thread.response.status <= 299:
-            tmpfile.write(body)
+        success = 200 <= thread.response.status <= 299
+        if success and self.settings.get("body_only", False):
+            if response.body:
+                tmpfile.write(body)
             body_only = True
 
         # Status line and headers. Store the file length.
         else:
             tmpfile.write(status_line + self.eol)
             tmpfile.write(self.eol.join(response.header_lines))
-            tmpfile.write(self.eol * 2)
-            tmpfile.write(response.body)
+            if response.body:
+                tmpfile.write(self.eol * 2)
+                tmpfile.write(response.body)
             body_only = False
 
         # Close the file.
@@ -217,7 +231,7 @@ class ResterHttpRequestCommand(sublime_plugin.WindowCommand):
 
         # Stop now in the event of an infinite loop.
         if self.redirect_count > MAX_REDIRECTS:
-            print("Maximum redirects reached.")
+            self._complete("Maximum redirects reached.")
             return
 
         # Read the location header and start a new request.
@@ -225,7 +239,7 @@ class ResterHttpRequestCommand(sublime_plugin.WindowCommand):
 
         # Stop now if no location header.
         if not location:
-            print("Unable to redirect. No Location header found.")
+            self._complete("Unable to redirect. No Location header found.")
             return
 
         # Create a new request instance.
@@ -255,33 +269,19 @@ class ResterHttpRequestCommand(sublime_plugin.WindowCommand):
         if uri.query:
             redirect.query += parse_qs(uri.query)
 
-        print("[...redirecting...]")
+        print("\n[...redirecting...]")
         self.redirect_count += 1
         self._start_request(redirect)
         return
 
-    def _handle_response_view(self, filepath, status_line, body_only,
-                              i=0, dir=1):
+    def _handle_response_view(self, filepath, status_line, body_only):
 
         if self.response_view.is_loading():
-
-            # This animates a little activity indicator in the status area.
-            before = i % 8
-            after = 7 - before
-            if not after:
-                dir = -1
-            if not before:
-                dir = 1
-            i += dir
-            message = "RESTer loading [%s=%s]" % (" " * before, " " * after)
-            self.request_view.set_status("rester", message)
-
             fn = lambda: self._handle_response_view(filepath, status_line,
-                                                    body_only, i, dir)
+                                                    body_only)
             sublime.set_timeout(fn, 100)
 
         else:
-
             view = self.response_view
             view.set_name(status_line)
 
@@ -301,11 +301,7 @@ class ResterHttpRequestCommand(sublime_plugin.WindowCommand):
 
             # Run response commands and finish.
             self._run_response_commands()
-
-            # Done message.
-            self.request_view.erase_status("rester")
-            message = "Request complete. " + status_line
-            sublime.status_message(message)
+            self._complete("Request complete. " + status_line)
 
     def _normalize_command(self, command):
 
