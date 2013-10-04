@@ -89,10 +89,6 @@ class RequestParser:
             self.request.host = uri.hostname
             self.request.path = uri.path
 
-        # Add a host header, if not explicitly set.
-        if not has_host_header and self.request.host:
-            self.request.headers["Host"] = self.request.host
-
         # Set path to / instead of empty.
         if not self.request.path:
             self.request.path = "/"

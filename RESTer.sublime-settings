@@ -11,6 +11,13 @@
     // List of encodings to try if not discernable from the response.
     "default_response_encodings": ["utf-8", "ISO-8859-1", "ascii"],
 
+    // Follow Redirect
+    "follow_redirects": true,
+
+    // When follow_redirects is true, follow any respons with one of these
+    // status codes.
+    "follow_redirect_status_codes": [300, 301, 302, 303, 307],
+
     // Output the request to the console.
     "output_request": true,
 

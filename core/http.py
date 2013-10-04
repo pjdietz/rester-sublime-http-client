@@ -74,10 +74,8 @@ class HttpRequestThread(threading.Thread):
             body_bytes = self.request.body.encode(self.encoding)
 
         try:
-            conn.request(self.request.method,
-                         self.request.get_full_path(),
-                         headers=self.request.headers,
-                         body=body_bytes)
+            conn.request(self.request.method, self.request.full_path,
+                         headers=self.request.headers, body=body_bytes)
         except ConnectionRefusedError:
             self.message = "Connection refused."
             self.success = False
@@ -123,9 +121,8 @@ class HttpRequestThread(threading.Thread):
         self.response.reason = resp.reason
 
         # Headers
-        self.response.headers = []
         for (key, value) in resp.getheaders():
-            self.response.headers.append("%s: %s" % (key, value))
+            self.response.headers[key] = value
 
         # Body
         self.response.body = self._read_body(resp.read(), resp)

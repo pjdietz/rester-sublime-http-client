@@ -12,16 +12,25 @@ try:
     from RESTer.core import http
     from RESTer.core import parse
     from RESTer.core import util
+    from RESTer.core.message import Request
     from RESTer.core.parse import RequestParser
+    from urllib.parse import parse_qs
+    from urllib.parse import urljoin
+    from urllib.parse import urlparse
+
 except ImportError:
     # Sublime Text 2
     from common.overrideable import OverrideableSettings
     from core import http
     from core import parse
     from core import util
+    from core.message import Request
     from core.parse import RequestParser
+    from urlparse import parse_qs
+    from urlparse import urlparse
+    from urlparse import urljoin
 
-
+MAX_REDIRECTS = 10
 RE_OVERRIDE = """^\s*@\s*([^\:]*)\s*:\s*(.*)$"""
 SETTINGS_FILE = "RESTer.sublime-settings"
 
@@ -34,6 +43,7 @@ class ResterHttpRequestCommand(sublime_plugin.WindowCommand):
         self.request_view = self.window.active_view()
         self.eol = util.get_end_of_line_character(self.request_view)
         self.settings = self._get_settings()
+        self.redirect_count = 0
 
         # Determine the encoding of the editor starting the request.
         # Sublime returns "Undefined" for views that are not yet saved.
@@ -148,7 +158,7 @@ class ResterHttpRequestCommand(sublime_plugin.WindowCommand):
     def _complete_thread(self, thread):
 
         response = thread.response
-        status_line = response.get_status_line()
+        status_line = response.status_line
 
         # Output the response to the console.
         output_headers = self.settings.get("output_response_headers", True)
@@ -162,6 +172,13 @@ class ResterHttpRequestCommand(sublime_plugin.WindowCommand):
                 print("\n".join(response.headers))
             elif output_body:
                 print(reponse.body)
+
+        # Redirect.
+        follow = self.settings.get("follow_redirects", True)
+        follow_codes = self.settings.get("follow_redirect_status_codes", [])
+        if follow and response.status in follow_codes:
+            self._follow_redirect(response, thread.request)
+            return
 
         # Stop now if the user does not want a response buffer.
         if not self.settings.get("response_buffer", True):
@@ -183,7 +200,7 @@ class ResterHttpRequestCommand(sublime_plugin.WindowCommand):
         # Status line and headers. Store the file length.
         else:
             tmpfile.write(status_line + self.eol)
-            tmpfile.write(self.eol.join(response.headers))
+            tmpfile.write(self.eol.join(response.header_lines))
             tmpfile.write(self.eol * 2)
             tmpfile.write(response.body)
             body_only = False
@@ -195,6 +212,53 @@ class ResterHttpRequestCommand(sublime_plugin.WindowCommand):
         # Open the file in a new view.
         self.response_view = self.window.open_file(filepath, sublime.TRANSIENT)
         self._handle_response_view(tmpfile.name, status_line, body_only)
+
+    def _follow_redirect(self, response, request):
+
+        # Stop now in the event of an infinite loop.
+        if self.redirect_count > MAX_REDIRECTS:
+            print("Maximum redirects reached.")
+            return
+
+        # Read the location header and start a new request.
+        location = response.get_header("Location")
+
+        # Stop now if no location header.
+        if not location:
+            print("Unable to redirect. No Location header found.")
+            return
+
+        # Create a new request instance.
+        redirect = Request()
+
+        # Use GET unless the original request was HEAD.
+        if request.method == "HEAD":
+            redirect.method = "HEAD"
+
+        # Parse the Location URI
+        uri = urlparse(location)
+
+        if uri.netloc:
+            # If there is a netloc, it's an absolute path.
+            redirect.host = uri.netloc
+            if uri.scheme:
+                redirect.protocol = uri.scheme
+            if uri.path:
+                redirect.path = uri.path
+
+        elif uri.path:
+            # If no netloc, but there is a path, resolve from last.
+            redirect.host = request.host
+            redirect.path = urljoin(request.path, uri.path)
+
+        # Always add the query.
+        if uri.query:
+            redirect.query += parse_qs(uri.query)
+
+        print("[...redirecting...]")
+        self.redirect_count += 1
+        self._start_request(redirect)
+        return
 
     def _handle_response_view(self, filepath, status_line, body_only,
                               i=0, dir=1):
