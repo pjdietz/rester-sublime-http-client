@@ -91,4 +91,6 @@ class Response(Message):
 
     @property
     def status_line(self):
-        return "%s %d %s" % (self.protocol, self.status, self.reason)
+        if self.protocol and self.status and self.reason:
+            return "%s %d %s" % (self.protocol, self.status, self.reason)
+        return None
