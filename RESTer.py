@@ -35,7 +35,13 @@ class ResterHttpRequestCommand(sublime_plugin.WindowCommand):
         self.eol = util.get_end_of_line_character(self.request_view)
         self.settings = self._get_settings()
 
-        # Perform commands on the request.
+        # Determine the encoding of the editor starting the request.
+        # Sublime returns "Undefined" for views that are not yet saved.
+        self.encoding = self.request_view.encoding()
+        if not self.encoding or self.encoding == "Undefined":
+            self.encoding = "UTF-8"
+
+        # Perform commands on the request buffer.
         # Store the number of changes made so we can undo them.
         try:
             changes = self.request_view.change_count()
@@ -56,19 +62,12 @@ class ResterHttpRequestCommand(sublime_plugin.WindowCommand):
         for i in range(changes):
             self.request_view.run_command("undo")
 
-        # Determine the encoding of the editor starting the request.
-        # Sublime returns "Undefined" for views that are not yet saved.
-        encoding = self.request_view.encoding()
-        if not encoding or encoding == "Undefined":
-            encoding = "UTF-8"
-
+        # Build a message.Request from the text.
         request_parser = RequestParser(self.settings, self.eol)
-        request = request_parser.get_request(text, encoding)
+        request = request_parser.get_request(text, self.encoding)
 
-        # Create, start, and handle a thread for the selection.
-        thread = http.HttpRequestThread(request, self.settings, encoding)
-        thread.start()
-        self._handle_thread(thread)
+        # Make the request.
+        self._start_request(request)
 
     def _get_selection(self):
         # Return the selected text or the entire buffer.
@@ -106,6 +105,18 @@ class ResterHttpRequestCommand(sublime_plugin.WindowCommand):
             settings=sublime.load_settings(SETTINGS_FILE),
             overrides=overrides)
 
+    def _start_request(self, request):
+
+        # Output the request to the console.
+        if self.settings.get("output_request", True):
+            print("[Request]")
+            print(request)
+
+        # Create, start, and handle a thread for the selection.
+        thread = http.HttpRequestThread(request, self.settings, self.encoding)
+        thread.start()
+        self._handle_thread(thread)
+
     def _handle_thread(self, thread, i=0, dir=1):
 
         if thread.is_alive():
@@ -136,8 +147,7 @@ class ResterHttpRequestCommand(sublime_plugin.WindowCommand):
 
     def _complete_thread(self, thread):
 
-        response_parser = parse.ResponseParser(self.settings, self.eol)
-        response = response_parser.get_response(thread.response, thread.body)
+        response = thread.response
         status_line = response.get_status_line()
 
         # Output the response to the console.
@@ -172,7 +182,7 @@ class ResterHttpRequestCommand(sublime_plugin.WindowCommand):
 
         # Status line and headers. Store the file length.
         else:
-            tmpfile.write(status_line)
+            tmpfile.write(status_line + self.eol)
             tmpfile.write(self.eol.join(response.headers))
             tmpfile.write(self.eol * 2)
             tmpfile.write(response.body)

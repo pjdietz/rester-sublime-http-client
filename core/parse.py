@@ -10,7 +10,6 @@ try:
     from RESTer.core import util
 except ImportError:
     # Sublime Text 2
-    from io import BytesIO
     from urlparse import urlparse
     from urlparse import parse_qs
     from urllib import quote
@@ -20,22 +19,6 @@ except ImportError:
 RE_METHOD = """(?P<method>[A-Z]+)"""
 RE_URI = """(?P<uri>[a-zA-Z0-9\-\/\.\_\:\?\#\[\]\@\!\$\&\=]+)"""
 RE_PROTOCOL = """(?P<protocol>.*)"""
-
-
-def decode(bytes, encodings):
-    """Return the first successfully decoded string or None"""
-    for encoding in encodings:
-        try:
-            decoded = bytes.decode(encoding)
-            return decoded
-        except UnicodeDecodeError:
-            # Try the next in the list.
-            pass
-    raise DecodeError
-
-
-class DecodeError(Exception):
-    pass
 
 
 class RequestParser:
@@ -207,84 +190,3 @@ class RequestParser:
             return m.groupdict()
 
         return None
-
-class ResponseParser:
-
-    def __init__(self, settings, eol):
-        self.settings = settings
-        self.eol = eol
-
-    def get_response(self, http_response, http_response_body):
-
-        self.response = message.Response()
-
-        # Store references
-        self.http_response = http_response
-        self.http_response_body = http_response_body
-
-        # HTTP/1.1 is the default
-        if self.http_response.version == 10:
-            self.response.protocol = "HTTP/1.0"
-
-        # Status
-        self.response.status = http_response.status
-        self.response.reason = http_response.reason
-
-        # Headers
-        self.response.headers = []
-        for (key, value) in self.http_response.getheaders():
-            self.response.headers.append("%s: %s" % (key, value))
-
-        # Body
-        self.response.body = self._read_body()
-
-        return self.response
-
-    def _read_body(self):
-        # Decode the body from a list of bytes
-        body_bytes = self.http_response_body
-        body_bytes = self._unzip_body(body_bytes)
-        body = self._decode_body(body_bytes)
-        body = util.normalize_line_endings(body, self.eol)
-        return body
-
-    def _unzip_body(self, body_bytes):
-        content_encoding = self.http_response.getheader("content-encoding")
-        if content_encoding:
-            content_encoding = content_encoding.lower()
-            if "gzip" in content_encoding or "defalte" in content_encoding:
-                body_bytes = zlib.decompress(body_bytes, 15+32)
-        return body_bytes
-
-    def _decode_body(self, body_bytes):
-
-        # Decode the body. The hard part here is finding the right encoding.
-        # To do this, create a list of possible matches.
-        encodings = []
-
-        # Check the content-type header, if present.
-        content_type = self.http_response.getheader("content-type")
-        if content_type:
-            encoding = util.scan_string_for_encoding(content_type)
-            if encoding:
-                encodings.append(encoding)
-
-        # Scan the body
-        encoding = util.scan_bytes_for_encoding(body_bytes)
-        if encoding:
-            encodings.append(encoding)
-
-        # Add any default encodings not already discovered.
-        default_encodings = self.settings.get(
-            "default_response_encodings", [])
-        for encoding in default_encodings:
-            if encoding not in encodings:
-                encodings.append(encoding)
-
-        # Decoding using the encodings discovered.
-        try:
-            body = decode(body_bytes, encodings)
-        except DecodeError:
-            body = "{Unable to decode body}"
-
-        return body
