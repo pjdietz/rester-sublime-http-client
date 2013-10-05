@@ -1,25 +1,30 @@
+"""
+Modules for making HTTP requests using the built in Python http.client module
+"""
+
 import socket
 import threading
 import zlib
-from rester import util, message
+
+from .message import Response
+from .util import normalize_line_endings
+from .util import scan_bytes_for_encoding
+from .util import scan_string_for_encoding
 
 try:
-    # Sublime Text 3
     from http.client import HTTPConnection
     from http.client import HTTPSConnection
-    from RESTer.core import message
-    from RESTer.core import util
 except ImportError:
-    # Sublime Text 2
+    # Python 2
     from httplib import HTTPConnection
     from httplib import HTTPSConnection
 
 
-def decode(bytes, encodings):
-    """Return the first successfully decoded string or None"""
+def decode(bytes_sequence, encodings):
+    """Return the first successfully decoded string"""
     for encoding in encodings:
         try:
-            decoded = bytes.decode(encoding)
+            decoded = bytes_sequence.decode(encoding)
             return decoded
         except UnicodeDecodeError:
             # Try the next in the list.
@@ -27,24 +32,28 @@ def decode(bytes, encodings):
     raise DecodeError
 
 
-class DecodeError(Exception):
-    pass
+def _unzip_body(body_bytes, resp):
+    content_encoding = resp.getheader("content-encoding")
+    if content_encoding:
+        content_encoding = content_encoding.lower()
+        if "gzip" in content_encoding or "defalte" in content_encoding:
+            body_bytes = zlib.decompress(body_bytes, 15 + 32)
+    return body_bytes
 
 
 class HttpRequestThread(threading.Thread):
-
     def __init__(self, request, settings, encoding="UTF8", eol="\n"):
         threading.Thread.__init__(self)
         self.request = request
         self.response = None
         self.message = None
         self.success = False
-        self.encoding = encoding
-        self.eol = eol
-        self.timeout = settings.get("timeout", None)
-        self.output_request = settings.get("output_request", True)
-        self.output_response = settings.get("output_response", True)
+        self._encoding = encoding
         self._encodings = settings.get("default_response_encodings", [])
+        self._eol = eol
+        self._output_request = settings.get("output_request", True)
+        self._output_response = settings.get("output_response", True)
+        self._timeout = settings.get("timeout", None)
 
     def run(self):
         """Method to run when the thread is started."""
@@ -64,12 +73,12 @@ class HttpRequestThread(threading.Thread):
         # Create the connection.
         conn = connection_class(self.request.host,
                                 port=self.request.port,
-                                timeout=self.timeout)
+                                timeout=self._timeout)
 
         # Convert the body to bytes
         body_bytes = None
         if self.request.body:
-            body_bytes = self.request.body.encode(self.encoding)
+            body_bytes = self.request.body.encode(self._encoding)
 
         try:
             conn.request(self.request.method, self.request.full_path,
@@ -87,6 +96,7 @@ class HttpRequestThread(threading.Thread):
             return
 
         # Read the response.
+        #noinspection PyBroadException
         try:
             resp = conn.getresponse()
         except socket.timeout:
@@ -108,7 +118,7 @@ class HttpRequestThread(threading.Thread):
     def _read_response(self, resp):
 
         # Read the HTTPResponse and populate the response member.
-        self.response = message.Response()
+        self.response = Response()
 
         # HTTP/1.1 is the default
         if resp.version == 10:
@@ -129,18 +139,10 @@ class HttpRequestThread(threading.Thread):
         # Decode the body from a list of bytes
         if not body_bytes:
             return None
-        body_bytes = self._unzip_body(body_bytes, resp)
+        body_bytes = _unzip_body(body_bytes, resp)
         body = self._decode_body(body_bytes, resp)
-        body = util.normalize_line_endings(body, self.eol)
+        body = normalize_line_endings(body, self._eol)
         return body
-
-    def _unzip_body(self, body_bytes, resp):
-        content_encoding = resp.getheader("content-encoding")
-        if content_encoding:
-            content_encoding = content_encoding.lower()
-            if "gzip" in content_encoding or "defalte" in content_encoding:
-                body_bytes = zlib.decompress(body_bytes, 15 + 32)
-        return body_bytes
 
     def _decode_body(self, body_bytes, resp):
 
@@ -151,12 +153,12 @@ class HttpRequestThread(threading.Thread):
         # Check the content-type header, if present.
         content_type = resp.getheader("content-type")
         if content_type:
-            encoding = util.scan_string_for_encoding(content_type)
+            encoding = scan_string_for_encoding(content_type)
             if encoding:
                 encodings.append(encoding)
 
         # Scan the body
-        encoding = util.scan_bytes_for_encoding(body_bytes)
+        encoding = scan_bytes_for_encoding(body_bytes)
         if encoding:
             encodings.append(encoding)
 
@@ -172,3 +174,7 @@ class HttpRequestThread(threading.Thread):
             body = "{Unable to decode body}"
 
         return body
+
+
+class DecodeError(Exception):
+    pass
