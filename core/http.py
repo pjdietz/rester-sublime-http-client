@@ -1,7 +1,7 @@
-import re
 import socket
 import threading
 import zlib
+from rester import util, message
 
 try:
     # Sublime Text 3
@@ -13,8 +13,6 @@ except ImportError:
     # Sublime Text 2
     from httplib import HTTPConnection
     from httplib import HTTPSConnection
-    from core import message
-    from core import util
 
 
 def decode(bytes, encodings):

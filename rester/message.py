@@ -1,16 +1,12 @@
-try:
-    # Sublime Text 3
-    from RESTer.core import util
-except ImportError:
-    # Sublime Text 2
-    from core import util
+from . import util
 
 
 class Message:
+    """Base class for HTTP messages"""
 
     def __init__(self):
         self.headers = {}
-        self.body = None
+        self.body = ""
 
     @property
     def header_lines(self):
@@ -26,7 +22,9 @@ class Message:
                 return self.headers[key]
         return None
 
+
 class Request(Message):
+    """Represents an HTTP requst"""
 
     def __init__(self):
         Message.__init__(self)
@@ -38,9 +36,6 @@ class Request(Message):
         self.query = {}
 
     def __str__(self):
-        """
-        Return a string representation of the request.
-        """
         lines = [self.request_line] + self.header_lines
         string = "\n".join(lines)
         if self.body:
@@ -71,18 +66,15 @@ class Request(Message):
 
 
 class Response(Message):
+    """Represents an HTTP request"""
 
     def __init__(self):
         Message.__init__(self)
         self.protocol = "HTTP/1.1"
-        self.status = None
+        self.status = 500
         self.reason = None
 
     def __str__(self):
-        """
-        Return a string representation of the request.
-        """
-
         lines = [self.status_line] + self.header_lines
         string = "\n".join(lines)
         if self.body:

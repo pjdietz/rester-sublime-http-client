@@ -25,6 +25,11 @@ if ST_VERSION == 3:
 # Modules with dependencies must be loaded after the dependencies.
 mods_load_order = [
     '',
+    '.overrideable',
+    '.util',
+    '.message',
+    '.parse',
+    '.commands.auto_form_encode_command',
     '.commands.http_request_command',
     '.commands',
 ]

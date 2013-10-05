@@ -1,24 +1,40 @@
+from .message import Request
+from .util import normalize_line_endings
+
 import re
-import zlib
 
 try:
-    # Sublime Text 3
+    # Python 3
     from urllib.parse import urlparse
     from urllib.parse import parse_qs
     from urllib.parse import quote
-    from RESTer.core import message
-    from RESTer.core import util
 except ImportError:
-    # Sublime Text 2
+    # Python 2
     from urlparse import urlparse
     from urlparse import parse_qs
     from urllib import quote
-    from core import message
-    from core import util
+
 
 RE_METHOD = """(?P<method>[A-Z]+)"""
 RE_URI = """(?P<uri>[a-zA-Z0-9\-\/\.\_\:\?\#\[\]\@\!\$\&\=]+)"""
 RE_PROTOCOL = """(?P<protocol>.*)"""
+
+
+def _read_request_line_dict(line):
+    # Return a dicionary containing information about the request.
+    # Ex: GET /path HTTP/1.1
+    m = re.search(RE_METHOD + "\s+" + RE_URI + "\s+" + RE_PROTOCOL, line)
+    if m:
+        return m.groupdict()
+    # Ex: GET /path HTTP/1.1
+    m = re.search(RE_METHOD + "\s+" + RE_URI, line)
+    if m:
+        return m.groupdict()
+    # Ex: /path or http://hostname/path
+    m = re.search(RE_URI, line)
+    if m:
+        return m.groupdict()
+    return None
 
 
 class RequestParser:
@@ -28,10 +44,11 @@ class RequestParser:
         self.eol = eol
         self.request = None
 
-    def get_request(self, text, encoding):
+    def get_request(self, text):
+        """Build and return a new Request"""
 
         # Build a new Request.
-        self.request = message.Request()
+        self.request = Request()
 
         # Set defaults from settings.
         self.request.headers = self.settings.get("default_headers", {})
@@ -40,7 +57,7 @@ class RequestParser:
 
         # Pre-parse clean-up.
         text = text.lstrip()
-        text = util.normalize_line_endings(text, self.eol)
+        text = normalize_line_endings(text, self.eol)
 
         # Split the string into lines.
         lines = text.split(self.eol)
@@ -65,15 +82,11 @@ class RequestParser:
         # Make a dictionary of headers.
         self._parse_header_lines(header_lines)
 
-        # Check if a Host header was supplied.
-        has_host_header = False
-        for key in self.request.headers:
-            if key.lower() == "host":
-                has_host_header = True
-                # If self._host is not yet set, read it from the header.
-                if not self.request.host:
-                    self.request.host = self.request.headers[key]
-                break
+        # Try to set the hostname from the host header, if not yet set.
+        if not self.request.host:
+            host = self.request.get_header("host")
+            if host:
+                self.request.host = host
 
         # If there is still no hostname, but there is a path, try re-parsing
         # the path with // prepended.
@@ -122,7 +135,7 @@ class RequestParser:
                 if key and value:
                     key = key.strip()
                     value = quote(value.strip())
-                    if key in self._query:
+                    if key in self.request.query:
                         self.request.query[key].append(value)
                     else:
                         self.request.query[key] = [value]
@@ -143,7 +156,8 @@ class RequestParser:
 
         # Parse the first line as the request line.
         # Fail, if unable to parse.
-        request_line = self._read_request_line_dict(line)
+
+        request_line = _read_request_line_dict(line)
         if not request_line:
             return
 
@@ -162,27 +176,3 @@ class RequestParser:
         # Read the method from the request line. Default is GET.
         if "method" in request_line:
             self.request.method = request_line["method"]
-
-    def _read_request_line_dict(self, line):
-
-        # Return a dicionary containing information about the request.
-
-        # method-uri-protocol
-        # Ex: GET /path HTTP/1.1
-        m = re.search(RE_METHOD + "\s+" + RE_URI + "\s+" + RE_PROTOCOL, line)
-        if m:
-            return m.groupdict()
-
-        # method-uri
-        # Ex: GET /path HTTP/1.1
-        m = re.search(RE_METHOD + "\s+" + RE_URI, line)
-        if m:
-            return m.groupdict()
-
-        # uri
-        # Ex: /path or http://hostname/path
-        m = re.search(RE_URI, line)
-        if m:
-            return m.groupdict()
-
-        return None

@@ -1,12 +1,12 @@
 import sublime
 import sublime_plugin
+from rester import util
 
 try:
     from RESTer.core import util
     from urllib.parse import quote
 except ImportError:
     # Sublime Text 2
-    from core import util
     from urllib import quote
 
 

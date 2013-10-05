@@ -5,6 +5,7 @@ import tempfile
 
 import sublime
 import sublime_plugin
+from rester import util
 
 try:
     # Sublime Text 3
@@ -20,12 +21,10 @@ try:
 
 except ImportError:
     # Sublime Text 2
-    from common.overrideable import OverrideableSettings
+    from rester.overrideable import OverrideableSettings
     from core import http
-    from core import parse
-    from core import util
-    from core.message import Request
-    from core.parse import RequestParser
+    from rester.message import Request
+    from rester.parse import RequestParser
     from urlparse import parse_qs
     from urlparse import urlparse
     from urlparse import urljoin
@@ -35,7 +34,7 @@ RE_OVERRIDE = """^\s*@\s*([^\:]*)\s*:\s*(.*)$"""
 SETTINGS_FILE = "RESTer.sublime-settings"
 
 
-class ResterHttpRequestCommand(sublime_plugin.WindowCommand):
+class OldResterHttpRequestCommand(sublime_plugin.WindowCommand):
 
     def run(self):
 
