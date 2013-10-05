@@ -46,9 +46,9 @@ def scan_string_for_encoding(string):
     return None
 
 
-def scan_bytes_for_encoding(bytes):
+def scan_bytes_for_encoding(bytes_sequence):
     """Read a byte sequence and return the encoding identified within."""
-    m = re.search(RE_ENCODING.encode('ascii'), bytes)
+    m = re.search(RE_ENCODING.encode('ascii'), bytes_sequence)
     if m:
         encoding = m.groups()[0]
         return encoding.decode('ascii')

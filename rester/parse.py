@@ -67,6 +67,7 @@ class RequestParser:
         # All lines following the request line are headers until an empty line.
         # All content after the empty line is the request body.
         has_body = False
+        i = 0
         for i in range(1, len(lines)):
             if lines[i] == "":
                 has_body = True
