@@ -1,7 +1,8 @@
+import re
+
 from .message import Request
 from .util import normalize_line_endings
 
-import re
 
 try:
     # Python 3
@@ -14,7 +15,6 @@ except ImportError:
     from urlparse import parse_qs
     from urllib import quote
 
-
 RE_METHOD = """(?P<method>[A-Z]+)"""
 RE_URI = """(?P<uri>[a-zA-Z0-9\-\/\.\_\:\?\#\[\]\@\!\$\&\=]+)"""
 RE_PROTOCOL = """(?P<protocol>.*)"""
@@ -26,11 +26,11 @@ def _read_request_line_dict(line):
     m = re.search(RE_METHOD + "\s+" + RE_URI + "\s+" + RE_PROTOCOL, line)
     if m:
         return m.groupdict()
-    # Ex: GET /path HTTP/1.1
+        # Ex: GET /path HTTP/1.1
     m = re.search(RE_METHOD + "\s+" + RE_URI, line)
     if m:
         return m.groupdict()
-    # Ex: /path or http://hostname/path
+        # Ex: /path or http://hostname/path
     m = re.search(RE_URI, line)
     if m:
         return m.groupdict()
@@ -38,7 +38,6 @@ def _read_request_line_dict(line):
 
 
 class RequestParser:
-
     def __init__(self, settings, eol):
         self.settings = settings
         self.eol = eol

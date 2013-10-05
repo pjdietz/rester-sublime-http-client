@@ -1,13 +1,12 @@
+import json
+import re
+
 from ..overrideable import OverrideableSettings
 from ..parse import RequestParser
 from ..util import get_end_of_line_character
 from ..util import normalize_line_endings
-
 import sublime
 import sublime_plugin
-
-import json
-import re
 
 
 MAX_REDIRECTS = 10
@@ -16,7 +15,6 @@ SETTINGS_FILE = "RESTer.sublime-settings"
 
 
 class ResterHttpRequestCommand(sublime_plugin.WindowCommand):
-
     def __init__(self, *args, **kwargs):
 
         self.encoding = "UTF-8"
@@ -26,7 +24,7 @@ class ResterHttpRequestCommand(sublime_plugin.WindowCommand):
         self._redirect_count = 0
         self._requesting = False
         self._completed_message = "Done"
-        sublime_plugin.WindowCommand.__init__(self,  *args, **kwargs)
+        sublime_plugin.WindowCommand.__init__(self, *args, **kwargs)
 
     def run(self):
 

@@ -2,7 +2,6 @@
 Utility functions
 """
 
-
 import re
 
 

@@ -1,5 +1,4 @@
 class OverrideableSettings():
-
     """
     Class for adding a layer of overrides on top of a Settings object
 

@@ -38,18 +38,17 @@ def has_form_encoded_header(header_lines):
         if ":" in line:
             (header, value) = line.split(":", 1)
             if header.lower() == "content-type" \
-                    and "x-www-form-urlencoded" in value:
+                and "x-www-form-urlencoded" in value:
                 return True
     return False
 
 
 class AutoFormEncodeCommand(sublime_plugin.TextCommand):
-
     """Encode a request as x-www-form-urlencoded"""
 
     def __init__(self, *args, **kwargs):
         self._edit = None
-        sublime_plugin.TextCommand.__init__(self,  *args, **kwargs)
+        sublime_plugin.TextCommand.__init__(self, *args, **kwargs)
 
     def run(self, edit):
         self._edit = edit
