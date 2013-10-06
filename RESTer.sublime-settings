@@ -62,5 +62,22 @@
     //     }
 
     // Timeout after this number of seconds.
-    "timeout": 15
+    "timeout": 15,
+
+    // Allowed values: "python", "curl"
+    //
+    // RESTer includes two clients to use to perform requests. The native
+    // Python client is the default, however some Linux users will not be
+    // able to make HTTPS requests due Python being compiled without SSL.
+    //
+    "http_client": "python",
+
+    // Path to the curl command. Only meaningful is request_client is "curl".
+    // As long as curl is on you path, you should not need to change this.
+    "curl_command": "curl",
+
+    // Additional options to send to cURL.
+    // Each option my be a separate string. For example, to add custom header:
+    // curl_options: ["--header", "\"X-Custom-Header: 1\""]
+    "curl_options": ["--header", "X-Custom-Header: 1"]
 }

@@ -1,3 +1,4 @@
+import codecs
 import hashlib
 import json
 import os
@@ -5,10 +6,11 @@ import re
 import tempfile
 import time
 
-from ..overrideable import OverrideableSettings
-from ..http import HttpRequestThread
-from ..parse import RequestParser
+from ..http import CurlRequestThread
+from ..http import HttpClientRequestThread
 from ..message import Request
+from ..overrideable import OverrideableSettings
+from ..parse import RequestParser
 from ..util import get_end_of_line_character
 from ..util import normalize_line_endings
 import sublime
@@ -173,15 +175,18 @@ class ResterHttpRequestCommand(sublime_plugin.WindowCommand):
             os.remove(filepath)
 
             # Select the body.
+            selection = None
             if body_only:
                 selection = sublime.Region(0, view.size())
             else:
                 eol = get_end_of_line_character(view)
                 headers = view.find(eol * 2, 0)
-                selection = sublime.Region(headers.b, view.size())
+                if headers:
+                    selection = sublime.Region(headers.b, view.size())
 
-            view.sel().clear()
-            view.sel().add(selection)
+            if selection:
+                view.sel().clear()
+                view.sel().add(selection)
 
             # Run response commands and finish.
             self._run_response_commands()
@@ -212,16 +217,26 @@ class ResterHttpRequestCommand(sublime_plugin.WindowCommand):
 
         # Output the response to the console.
         output_headers = self.settings.get("output_response_headers", True)
-        output_body = self.settings.get("output_response_body", True)
+        output_body = self.settings.get("output_response_body", True) and \
+            response.body
+
         if output_headers or output_body:
+
             print("\n[Response]")
-            if output_headers and output_body:
-                print(response)
-            elif output_headers:
+
+            if output_headers:
                 print(status_line)
-                print("\n".join(response.headers))
-            elif output_body:
-                print(response.body)
+                print("\n".join(response.header_lines))
+
+            if output_headers and output_body:
+                print("")
+
+            if output_body:
+                try:
+                    print(response.body)
+                except UnicodeEncodeError:
+                    # Python 2
+                    print(response.body.encode("UTF8"))
 
         # Redirect.
         follow = self.settings.get("follow_redirects", True)
@@ -236,7 +251,11 @@ class ResterHttpRequestCommand(sublime_plugin.WindowCommand):
             return
 
         # Open a temporary file to write the response to.
+        # (Note: Using codecs to support Python 2.6)
         tmpfile = tempfile.NamedTemporaryFile("w", delete=False)
+        filename = tmpfile.name
+        tmpfile.close()
+        tmpfile = codecs.open(filename, "w", encoding="UTF8")
 
         # Body only, but only on success.
         success = 200 <= thread.response.status <= 299
@@ -245,13 +264,23 @@ class ResterHttpRequestCommand(sublime_plugin.WindowCommand):
                 tmpfile.write(response.body)
             body_only = True
 
-        # Status line and headers. Store the file length.
+        # Status line and headers.
         else:
-            tmpfile.write(status_line + self.eol)
-            tmpfile.write(self.eol.join(response.header_lines))
+
+            tmpfile.write(response.status_line)
+            tmpfile.write("\n")
+
+            for header in response.header_lines:
+                tmpfile.write(header)
+                tmpfile.write("\n")
+
             if response.body:
-                tmpfile.write(self.eol * 2)
+                tmpfile.write("\n")
                 tmpfile.write(response.body)
+
+            body_only = False
+
+        if not response.body:
             body_only = False
 
         # Close the file.
@@ -367,7 +396,28 @@ class ResterHttpRequestCommand(sublime_plugin.WindowCommand):
         # Create, start, and handle a thread for the selection.
         if self.settings.get("output_request", True):
             print("\n[Request]")
-            print(request)
-        thread = HttpRequestThread(request, self.settings, self.encoding)
+            print(request.request_line)
+            for header in request.header_lines:
+                print(header)
+            if request.body:
+                print("")
+                try:
+                    print(request.body)
+                except UnicodeEncodeError:
+                    # Python 2
+                    print(request.body.encode("UTF8"))
+
+        client = self.settings.get("http_client", "python")
+        if client == "python":
+            thread_class = HttpClientRequestThread
+        elif client == "curl":
+            thread_class = CurlRequestThread
+        else:
+            message = "Invalid request_client. "
+            message += "Must be 'python' or 'curl'. Found " + client
+            self._complete(message)
+            return
+
+        thread = thread_class(request, self.settings, encoding=self.encoding)
         thread.start()
         self.handle_thread(thread)

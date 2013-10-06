@@ -1,7 +1,7 @@
 from . import util
 
 
-class Message:
+class Message(object):
     """Base class for HTTP messages"""
 
     def __init__(self):
@@ -35,13 +35,6 @@ class Request(Message):
         self.port = None
         self.query = {}
 
-    def __str__(self):
-        lines = [self.request_line] + self.header_lines
-        string = "\n".join(lines)
-        if self.body:
-            string += "\n\n" + self.body
-        return string
-
     @property
     def host(self):
         return self._host
@@ -64,6 +57,15 @@ class Request(Message):
         """First line, ex: GET /my-path/ HTTP/1.1"""
         return "%s %s HTTP/1.1" % (self.method, self.full_path)
 
+    @property
+    def uri(self):
+        """Full URI, including protocol"""
+        uri = self.protocol + "://" + self._host
+        if self.port:
+            uri += ":" + str(self.port)
+        uri += self.full_path
+        return uri
+
 
 class Response(Message):
     """Represents an HTTP request"""
@@ -73,13 +75,6 @@ class Response(Message):
         self.protocol = "HTTP/1.1"
         self.status = 500
         self.reason = None
-
-    def __str__(self):
-        lines = [self.status_line] + self.header_lines
-        string = "\n".join(lines)
-        if self.body:
-            string += "\n\n" + self.body
-        return string
 
     @property
     def status_line(self):

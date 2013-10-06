@@ -3,7 +3,6 @@ import re
 from .message import Request
 from .util import normalize_line_endings
 
-
 try:
     # Python 3
     from urllib.parse import urlparse
@@ -17,20 +16,13 @@ except ImportError:
 
 RE_METHOD = """(?P<method>[A-Z]+)"""
 RE_URI = """(?P<uri>[a-zA-Z0-9\-\/\.\_\:\?\#\[\]\@\!\$\&\=]+)"""
-RE_PROTOCOL = """(?P<protocol>.*)"""
 
 
 def _read_request_line_dict(line):
     # Return a dicionary containing information about the request.
-    # Ex: GET /path HTTP/1.1
-    m = re.search(RE_METHOD + "\s+" + RE_URI + "\s+" + RE_PROTOCOL, line)
-    if m:
-        return m.groupdict()
-        # Ex: GET /path HTTP/1.1
     m = re.search(RE_METHOD + "\s+" + RE_URI, line)
     if m:
         return m.groupdict()
-        # Ex: /path or http://hostname/path
     m = re.search(RE_URI, line)
     if m:
         return m.groupdict()
@@ -50,16 +42,27 @@ class RequestParser:
         self.request = Request()
 
         # Set defaults from settings.
-        self.request.headers = self.settings.get("default_headers", {})
+        default_headers = self.settings.get("default_headers", {})
+        for header in default_headers:
+            self.request.headers[header] = default_headers[header]
+
         self.request.port = self.settings.get("port", None)
         self.request.protocol = self.settings.get("protocol", None)
 
         # Pre-parse clean-up.
-        text = text.lstrip()
         text = normalize_line_endings(text, self.eol)
 
         # Split the string into lines.
         lines = text.split(self.eol)
+
+        # Consume empty and comment lines at the top.
+        for i in range(len(lines)):
+            line = lines[i].strip()
+            if line == "" or line[0] == "#":
+                pass
+            else:
+                lines = lines[i:]
+                break
 
         # Parse the first line as the request line.
         self._parse_request_line(lines[0])
@@ -99,7 +102,7 @@ class RequestParser:
         #
         if not self.request.host and self.request.path:
             uri = urlparse("//" + self.request.path)
-            self.request.host = uri.hostname
+            self.request.host = uri.netloc
             self.request.path = uri.path
 
         # Set path to / instead of empty.
@@ -165,13 +168,18 @@ class RequestParser:
         uri = urlparse(request_line["uri"])
 
         # Copy from the parsed URI.
-        self.request.host = uri.hostname
-        self.request.path = uri.path
-        self.request.query = parse_qs(uri.query)
         if uri.scheme:
             self.request.protocol = uri.scheme
+        if uri.netloc:
+            self.request.host = uri.netloc
         if uri.port:
             self.request.port = uri.port
+        if uri.path:
+            self.request.path = uri.path
+        if uri.query:
+            query = parse_qs(uri.query)
+            for key in query:
+                self.request.query[key] = query[key]
 
         # Read the method from the request line. Default is GET.
         if "method" in request_line:
