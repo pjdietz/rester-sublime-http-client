@@ -12,14 +12,23 @@ from .message import Response
 from .util import normalize_line_endings
 from .util import scan_bytes_for_encoding
 from .util import scan_string_for_encoding
+import sublime
 
 try:
     from http.client import HTTPConnection
-    from http.client import HTTPSConnection
+    try:
+        from http.client import HTTPSConnection
+    except ImportError:
+        # Linux with no SSL support.
+        pass
 except ImportError:
     # Python 2
     from httplib import HTTPConnection
-    from httplib import HTTPSConnection
+    try:
+        from httplib import HTTPSConnection
+    except ImportError:
+        # Linux with no SSL support.
+        pass
 
 
 def decode(bytes_sequence, encodings):
@@ -123,7 +132,17 @@ class HttpClientRequestThread(HttpRequestThread):
 
         # Determine the class to use for the connection.
         if self.request.protocol == "https":
-            connection_class = HTTPSConnection
+            try:
+                connection_class = HTTPSConnection
+            except NameError:
+                message = "Your Python interpreter does not have SSL. " \
+                          "If you have cURL installed, set the http_client " \
+                          "setting to \"curl\"."
+                sublime.error_message(message)
+                self.message = "Unable to make HTTPS requests."
+                self.success = False
+                return
+
         else:
             connection_class = HTTPConnection
 

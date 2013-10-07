@@ -1,6 +1,6 @@
 [
     {
-      "keys": ["ctrl+alt+r"],
+      "keys": ["ctrl+shift+r"],
       "command": "rester_http_request"
     }
 ]
