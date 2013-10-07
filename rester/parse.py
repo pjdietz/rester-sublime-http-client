@@ -171,7 +171,11 @@ class RequestParser:
         if uri.scheme:
             self.request.protocol = uri.scheme
         if uri.netloc:
-            self.request.host = uri.netloc
+            # Sometimes urlparse leave the port in the netloc.
+            if ":" in uri.netloc:
+                (self.request.host, self.request.port) = uri.netloc.split(":")
+            else:
+                self.request.host = uri.netloc
         if uri.port:
             self.request.port = uri.port
         if uri.path:
