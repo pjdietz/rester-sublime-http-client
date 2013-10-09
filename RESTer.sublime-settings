@@ -2,6 +2,19 @@
     // Do not include headers when writing the response to a new buffer.
     "body_only": false,
 
+    // Path to the curl command. If curl is on you path, you should not need to
+    // change this. Windows users will need to use forward slashes in the path.
+    //
+    // Only meaningful when http_client is "curl"
+    "curl_command": "curl",
+
+    // Additional options to send to cURL. Each option must be a separate
+    // string. For example, to add custom header:
+    // curl_options: ["--header", "X-Custom-Header: 1"]
+    //
+    // Only meaningful when http_client is "curl"
+    "curl_options": [],
+
     // Default headers to add for each request.
     "default_headers": {
         "Accept-Encoding": "gzip, deflate",
@@ -11,18 +24,30 @@
     // List of encodings to try if not discernable from the response.
     "default_response_encodings": ["utf-8", "ISO-8859-1", "ascii"],
 
-    // Follow Redirect
+    // Automatically make a GET (or HEAD) request to the URI in the Location
+    // header upon receiveing a response with a redirect status code listed
+    // in follow_redirect_status_codes.
     "follow_redirects": true,
 
-    // When follow_redirects is true, follow any respons with one of these
+    // When follow_redirects is true, follow any response with one of these
     // status codes.
     "follow_redirect_status_codes": [300, 301, 302, 303, 307],
+
+    // RESTer includes two clients to use to perform requests. The native
+    // Python client is the default, however some Linux users will not be
+    // able to make HTTPS requests if Python was compiled without SSL.
+    //
+    // If you have cURL installed, you may want to set this to "curl". See
+    // also the options "curl_command" and "curl_options".
+    //
+    // Allowed values: "python", "curl"
+    "http_client": "python",
 
     // Output the request to the console.
     "output_request": true,
 
     // Output the response headers to the console.
-    "output_repsonse_headers": true,
+    "output_response_headers": true,
 
     // Output the response body to the console.
     "output_response_body": true,
@@ -37,17 +62,7 @@
 
     // List of commands to run on the request.
     // These commands will be undone after the request is issued.
-    "request_commands": [
-        "auto_form_encode",
-        "merge_variables"
-    ],
-
-    // Create a new buffer for the response.
-    "response_buffer": true,
-
-    // Commands to run on the body of the resonse.
-    "response_commands": ["prettyjson"],
-
+    //
     // Each request or response command must be a string (the name of the
     // command), or an object with a "name" member (the name of the command)
     // and optionally an "args" member as an object of arguments to pass to the
@@ -60,24 +75,19 @@
     //             "active_sets": ["mysite", "mysite-dev"]
     //          }
     //     }
+    //
+    "request_commands": [
+        "auto_form_encode",
+        "merge_variables"
+    ],
+
+    // Create a new buffer for the response.
+    "response_buffer": true,
+
+    // Commands to run on the body of the resonse.
+    "response_commands": ["prettyjson"],
 
     // Timeout after this number of seconds.
-    "timeout": 15,
+    "timeout": 15
 
-    // Allowed values: "python", "curl"
-    //
-    // RESTer includes two clients to use to perform requests. The native
-    // Python client is the default, however some Linux users will not be
-    // able to make HTTPS requests due Python being compiled without SSL.
-    //
-    "http_client": "python",
-
-    // Path to the curl command. Only meaningful is request_client is "curl".
-    // As long as curl is on you path, you should not need to change this.
-    "curl_command": "curl",
-
-    // Additional options to send to cURL.
-    // Each option my be a separate string. For example, to add custom header:
-    // curl_options: ["--header", "\"X-Custom-Header: 1\""]
-    "curl_options": ["--header", "X-Custom-Header: 1"]
 }
