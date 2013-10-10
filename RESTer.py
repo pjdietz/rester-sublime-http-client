@@ -9,7 +9,7 @@ import sys
 
 import sublime
 
-EXPECTED_PACKAGE_DIR = "rester-sublime-http-client"
+EXPECTED_PACKAGE_DIR = "RESTer HTTP Client"
 RELOADER_NAME = "rester.reloader"
 
 if int(sublime.version()) > 3000:

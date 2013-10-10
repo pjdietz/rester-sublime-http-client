@@ -15,7 +15,7 @@
                             {
                                 "caption": "Settings – Default",
                                 "args": {
-                                    "file": "${packages}/rester-sublime-http-client/RESTer.sublime-settings"
+                                    "file": "${packages}/RESTer HTTP Client/RESTer.sublime-settings"
                                 },
                                 "command": "open_file"
                             },
