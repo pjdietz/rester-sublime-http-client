@@ -1,0 +1,19 @@
+RESTer 1.4.0 Change Log
+
+
+New Features:
+
+- cURL
+
+    To allow Linux users to make HTTPS requests, I added the ability to use
+    cURL in place of the native Python connection. This is an optional feature
+    and must be turned on through the settings.
+
+- Redirects
+
+    RESTer can now automatically follow redirects. This can be disabled through
+    settings, either entirely, or for specific status codes.
+
+- Sublime Text 2
+
+    RESTer will now work in Sublime Text 2.

@@ -1,8 +1,8 @@
 # RESTer
 
-HTTP client for Sublime Text 3
+HTTP client for Sublime Text
 
-RESTer allows you to build an HTTP request in Sublime Text 3 and view the response in a new tab.
+RESTer allows you to build an HTTP request in Sublime Text and view the response in a new tab.
 
 ## Using
 
@@ -223,7 +223,7 @@ Host: api.my-secure-example-site.com
 @protocol:https
 ```
 
-**Note:** HTTPS support is only available if Python was compiled with SSL support (through the ssl module).
+**Note for Linux Users:** The Python interpreter in Sublime Text on Linux does not have SSL support. To make HTTPS requests, you will need to change the RESTer settings to use [cURL](#curl).
 
 ### Port
 
@@ -315,6 +315,37 @@ Most of the time, you'll only need to supply the name for a command. Some comman
     }
 }
 ```
+
+### Redirects
+
+RESTer will follow redirects automatically. To disable this or limit the response codes which will trigger an automatic redirect, modify these settings (defaults shown):
+
+```json
+{
+    "follow_redirects": true,
+    "follow_redirect_status_codes": [300, 301, 302, 303, 307]
+}
+```
+
+### cURL
+
+If you have [cURL](http://curl.haxx.se/) installed, you can set RESTer to use cURL instead of the Python `http.client` library. Most users will not need to do this, but this may be helpful for Linux users that are unable to make HTTPS requests because Python was not compiled with SSL support. Or, if you're familiar with using cURL on the command line, you may find it useful to add custom arguments to the cURL command.
+
+There are three settings related to cURL. The first is `http_client` which tells RESTer which client to use (allowed values are `python` for the native Python connector or `curl` for cURL.).
+
+Next is `curl_command` which is the path to the cURL executable. On OSX and Linux, if `curl` is on your path, you will not need to change this. Windows users providing a full path to `curl.exe` will need to use forward slashes in the path (e.g., `C:/curl/curl.exe`).
+
+The last setting is `curl_options`, an optional list of arguments to pass to the `curl` executable. Each option must be a separate string, so to send a custom header, use `["--header", "X-custom-header: header-value"]`, not `"--header X-custom-header: header-value"`. Here's an example showing these three settings:
+
+```json
+{
+    "http_client": "curl",
+    "curl_command": "C:/curl/curl.exe",
+    "curl_options": ["--header", "X-custom-header: header-value"]
+}
+```
+
+For more information on cURL, see the [cURL man page](http://curl.haxx.se/docs/manpage.html)
 
 ## Author
 
