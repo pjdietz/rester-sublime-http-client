@@ -84,7 +84,7 @@
     // Create a new buffer for the response.
     "response_buffer": true,
 
-    // Commands to run on the body of the resonse.
+    // Commands to run on the body of the response.
     "response_commands": ["prettyjson"],
 
     // Timeout after this number of seconds.
