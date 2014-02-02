@@ -42,7 +42,7 @@ You can install RESTer using the excellent [Package Control][] package manager f
 To install, clone to your "Packages" directory.
 
 ```
-git clone git@github.com:pjdietz/rester-sublime-http-client.git "RESTer HTTP Client"
+git clone https://github.com/pjdietz/rester-sublime-http-client.git "RESTer HTTP Client"
 ```
 
 **Note** RESTer expects to be installed to a directory called "RESTer HTTP Client". Some features like the meny command to open settings will not work if installed somewhere else.
