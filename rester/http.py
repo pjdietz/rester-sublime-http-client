@@ -6,6 +6,7 @@ import json
 import socket
 import subprocess
 import threading
+import time
 import zlib
 
 from .message import Response
@@ -50,6 +51,7 @@ class HttpRequestThread(threading.Thread):
         self.response = None
         self.message = None
         self.success = False
+        self.elapsed = None
         self._encoding = encoding
         self._encodings = settings.get("default_response_encodings", [])
         self._eol = eol
@@ -176,6 +178,7 @@ class HttpClientRequestThread(HttpRequestThread):
         # Read the response.
         #noinspection PyBroadException
         try:
+            time_start = time.time()
             resp = conn.getresponse()
         except socket.timeout:
             self.message = "Request timed out."
@@ -190,6 +193,8 @@ class HttpClientRequestThread(HttpRequestThread):
 
         # Read the response
         self._read_response(resp)
+        time_end = time.time()
+        self.elapsed = time_end - time_start
         conn.close()
         self.success = True
 
@@ -227,7 +232,10 @@ class CurlRequestThread(HttpRequestThread):
 
         # Build the list of arguments to run cURL.
         curl = subprocess.Popen(self._get_args(), stdout=subprocess.PIPE)
+        time_start = time.time()
         output = curl.communicate()[0]
+        time_end = time.time()
+        self.elapsed = time_end - time_start
         returncode = curl.returncode
         if returncode != 0:
             self._read_curl_error(returncode)

@@ -161,15 +161,15 @@ class ResterHttpRequestCommand(sublime_plugin.WindowCommand):
                 self._completed_message = "Done."
             self.request_view.set_status("rester", self._completed_message)
 
-    def handle_response_view(self, filepath, status_line, body_only):
+    def handle_response_view(self, filepath, title, body_only):
         if self.response_view.is_loading():
-            fn = lambda: self.handle_response_view(filepath, status_line,
+            fn = lambda: self.handle_response_view(filepath, title,
                                                    body_only)
             sublime.set_timeout(fn, 100)
 
         else:
             view = self.response_view
-            view.set_name(status_line)
+            view.set_name(title)
 
             # Delete the temp file.
             os.remove(filepath)
@@ -190,7 +190,7 @@ class ResterHttpRequestCommand(sublime_plugin.WindowCommand):
 
             # Run response commands and finish.
             self._run_response_commands()
-            self._complete("Request complete. " + status_line)
+            self._complete("Request complete. " + title)
 
     def handle_thread(self, thread):
         if thread.is_alive():
@@ -221,6 +221,9 @@ class ResterHttpRequestCommand(sublime_plugin.WindowCommand):
             response.body
 
         if output_headers or output_body:
+
+            if thread.elapsed:
+                print("\nResponse time:", thread.elapsed)
 
             print("\n[Response]")
 
@@ -288,8 +291,11 @@ class ResterHttpRequestCommand(sublime_plugin.WindowCommand):
         filepath = tmpfile.name
 
         # Open the file in a new view.
+        title = status_line
+        if thread.elapsed:
+            title += " (%.4f sec.)" % thread.elapsed
         self.response_view = self.window.open_file(filepath, sublime.TRANSIENT)
-        self.handle_response_view(tmpfile.name, status_line, body_only)
+        self.handle_response_view(tmpfile.name, title, body_only)
 
     def _get_selection(self):
         # Return a string of the selected text or the entire buffer.
