@@ -174,7 +174,7 @@ class ResterHttpRequestCommand(sublime_plugin.WindowCommand):
 
         else:
             view = self.response_view
-            view.set_scratch(True)
+            view.set_scratch(self.settings.get("response_scratch", True))
             view.set_name(title)
 
             # Delete the temp file.
@@ -198,14 +198,21 @@ class ResterHttpRequestCommand(sublime_plugin.WindowCommand):
             self._run_response_commands()
             self._complete("Request complete. " + title)
 
-            # Return the request view to the original group and index.
-            self.window.set_view_index(self.request_view,
-                                       self._request_view_group,
-                                       self._request_view_index)
+            # Close all views in the response group other than the current
+            # response view.
+            if (not self.settings.get("response_group", None) is None) \
+                    and self.settings.get("response_group_clean", False):
 
-            # Set the focus back to the request.
+                views = self.window.views_in_group(self.window.active_group())
+                for other_view in views:
+                    if other_view.id() != view.id():
+                        self.window.focus_view(other_view)
+                        self.window.run_command("close_file")
+
+            # Set the focus back to the request group and view.
             if self.settings.get("request_focus", False):
                 self.window.focus_group(self._request_view_group)
+                self.window.focus_view(self.request_view)
 
     def handle_thread(self, thread):
         if thread.is_alive():
@@ -308,9 +315,21 @@ class ResterHttpRequestCommand(sublime_plugin.WindowCommand):
         # Focus (create, if needed) a group specific for responses.
         response_group = self.settings.get("response_group", None)
         if not response_group is None:
+
             response_group = min(response_group, MAX_GROUPS)
+            created_new_group = False
             while self.window.num_groups() < response_group + 1:
                 self.window.run_command("new_pane")
+                created_new_group = True
+
+            # When Sublime creates a new group, it moves the current view to
+            # it. Return the request view to the original group and index.
+            if created_new_group:
+                self.window.set_view_index(self.request_view,
+                                           self._request_view_group,
+                                           self._request_view_index)
+
+            # Set the focus to the response group.
             self.window.focus_group(response_group)
 
         # Open the file in a new view.

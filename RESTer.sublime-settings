@@ -95,9 +95,26 @@
     // RESTer will create the group.
     //
     // Use null to open the response in the same group as the request.
+    //
+    // For two-column, side-by-side mode, set to 1. (0 is the request group.)
+    // These settings work well for a standard two-column mode:
+    //
+    // "response_group": 1,
+    // "response_group_clean": true,
+    // "request_focus": true
+    //
     "response_group": null,
+
+    // Set to true to close all other views in the response group when
+    // displaying the response.
+    //
+    // Only use this if you are working if "response_group" is set.
+    "response_group_clean": false,
+
+    // Prevent response views from reporting a dirty state allowing them
+    // to be closed without a save prompt.
+    "response_scratch": true,
 
     // Timeout after this number of seconds.
     "timeout": 15
-
 }

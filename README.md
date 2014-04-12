@@ -194,7 +194,7 @@ Host: /api.my-example-site.com
 
 ### Displaying the Response and Request
 
-By default, RESTer outputs the request and response to the console and opens a new buffer where it writes the full contents of the response. You can change this behavior by tweaking several settings.
+By default, RESTer outputs the request and response to the console and opens a new buffer where it writes the full contents of the response. This view is created in the same group as the request view. You can change this behavior by tweaking several settings.
 
 Setting                 | Default | Description
 ----------------------- | ------- | -----------
@@ -202,7 +202,22 @@ output_request          | `true`  | Write the request to the console.
 output_response_headers | `true`  | Write the status line and headers to the console.
 output_response_body    | `true`  | Write the body of response to the console. **Note**: because [response commands](#response-commands) must by run in a buffer, the body is not processed.
 response_buffer         | `true`  | Open a new buffer, write the response, and run any number of [response commands](#response-commands) on the response body.
+response_group          | `null`  | Set to the integer index of the group the response should appear in. `1` is the typical choice for a two-column presentation.
+response_group_clean    | `false` | If indicating a specific response_group, close all other views in that group on each response.
+request_focus           | `false` | Return focus to the request view after displaying the response.
 body_only               | `false` | When writing the response to the buffer, do not include headers.
+
+#### Side-by-Side Mode
+
+If you'd like to author your request in one panel and view your response in a second, use this configuration:
+
+```json
+{
+    "response_group": 1,
+    "response_group_clean": true,
+    "request_focus": true
+}
+```
 
 ### Protocol
 
@@ -263,7 +278,7 @@ To specify commands for RESTer to run on the response, add entries to the `respo
 
 ```json
 {
-    "response_commands": ["prettyjson"]
+    "response_commands": ["pretty_json"]
 }
 ```
 

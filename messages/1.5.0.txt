@@ -1,0 +1,27 @@
+RESTer 1.5.0 Change Log
+
+
+New Features:
+
+- Side-by-side mode
+
+    Responses can now open in a specific group. You can tweak the settings to
+    behave how you like, but these settings will work for a standard,
+    two-column, side-by-side mode:
+
+    {
+        "response_group": 1,
+        "response_group_clean": true,
+        "request_focus": true
+    }
+
+    See the configuration file or README for descriptions of these options.
+
+- Response views now marked as "scratch"
+
+    When a response loads, the view is marked as a "scratch" view to prevent
+    Sublime from prompting to save on close. If you work extensively with the
+    requested data and want to have this prompt, set "response_scratch" to
+    False in the configuration.
+
+

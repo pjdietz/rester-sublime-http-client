@@ -1,0 +1,8 @@
+RESTer 1.4.3 Change Log
+
+
+Bug Fix:
+
+    Default response command updated to call "pretty_json" instead of
+    "prettyjson" to match Pretty JSON's new API.
+
