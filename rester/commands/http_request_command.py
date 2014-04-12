@@ -174,6 +174,7 @@ class ResterHttpRequestCommand(sublime_plugin.WindowCommand):
 
         else:
             view = self.response_view
+            view.set_scratch(True)
             view.set_name(title)
 
             # Delete the temp file.
