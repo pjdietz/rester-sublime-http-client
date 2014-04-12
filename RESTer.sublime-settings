@@ -81,11 +81,21 @@
         "merge_variables"
     ],
 
+    // If true, return focus to the request view.
+    // If false, keep focus on the new response view.
+    "request_focus": false,
+
     // Create a new buffer for the response.
     "response_buffer": true,
 
     // Commands to run on the body of the response.
     "response_commands": ["pretty_json"],
+
+    // Open the response in a specific group. If no group at that index exists,
+    // RESTer will create the group.
+    //
+    // Use null to open the response in the same group as the request.
+    "response_group": null,
 
     // Timeout after this number of seconds.
     "timeout": 15

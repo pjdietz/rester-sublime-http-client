@@ -27,6 +27,7 @@ except ImportError:
     from urlparse import urljoin
 
 MAX_REDIRECTS = 10
+MAX_GROUPS = 10
 RE_OVERRIDE = """^\s*@\s*([^\:]*)\s*:\s*(.*)$"""
 SETTINGS_FILE = "RESTer.sublime-settings"
 
@@ -79,11 +80,15 @@ class ResterHttpRequestCommand(sublime_plugin.WindowCommand):
         self._completed_message = "Done."
         self._redirect_count = 0
         self._requesting = False
+        self._request_view_group = None
+        self._request_view_index = None
 
     def run(self):
 
         # Store references.
         self.request_view = self.window.active_view()
+        self._request_view_group, self._request_view_index = \
+            self.window.get_view_index(self.request_view)
         self.response_view = None
         self.eol = get_end_of_line_character(self.request_view)
         self.settings = self._get_settings()
@@ -192,6 +197,15 @@ class ResterHttpRequestCommand(sublime_plugin.WindowCommand):
             self._run_response_commands()
             self._complete("Request complete. " + title)
 
+            # Return the request view to the original group and index.
+            self.window.set_view_index(self.request_view,
+                                       self._request_view_group,
+                                       self._request_view_index)
+
+            # Set the focus back to the request.
+            if self.settings.get("request_focus", False):
+                self.window.focus_group(self._request_view_group)
+
     def handle_thread(self, thread):
         if thread.is_alive():
             # Working...
@@ -289,6 +303,14 @@ class ResterHttpRequestCommand(sublime_plugin.WindowCommand):
         # Close the file.
         tmpfile.close()
         filepath = tmpfile.name
+
+        # Focus (create, if needed) a group specific for responses.
+        response_group = self.settings.get("response_group", None)
+        if not response_group is None:
+            response_group = min(response_group, MAX_GROUPS)
+            while self.window.num_groups() < response_group + 1:
+                self.window.run_command("new_pane")
+            self.window.focus_group(response_group)
 
         # Open the file in a new view.
         title = status_line
