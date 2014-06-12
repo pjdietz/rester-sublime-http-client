@@ -6,6 +6,7 @@ import re
 import tempfile
 import time
 
+from ..constants import SETTINGS_FILE
 from ..http import CurlRequestThread
 from ..http import HttpClientRequestThread
 from ..message import Request
@@ -29,7 +30,6 @@ except ImportError:
 MAX_REDIRECTS = 10
 MAX_GROUPS = 10
 RE_OVERRIDE = """^\s*@\s*([^\:]*)\s*:\s*(.*)$"""
-SETTINGS_FILE = "RESTer.sublime-settings"
 
 
 def _normalize_command(command):

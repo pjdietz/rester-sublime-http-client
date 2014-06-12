@@ -33,6 +33,13 @@
     // status codes.
     "follow_redirect_status_codes": [300, 301, 302, 303, 307],
 
+    // When contructing form fields using the auto_form_encode command, RESTer
+    // will normally strip whitespace from field values and parse only single-
+    // line field values. To include a multiline value or to preserve the
+    // whitespace of a value, wrap the value in these delimiteres:
+    "form_field_start": "\"\"\"",
+    "form_field_end": "\"\"\"",
+
     // RESTer includes two clients to use to perform requests. The native
     // Python client is the default, however some Linux users will not be
     // able to make HTTPS requests if Python was compiled without SSL.

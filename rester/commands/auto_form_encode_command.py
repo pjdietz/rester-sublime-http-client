@@ -1,3 +1,4 @@
+from ..constants import SETTINGS_FILE
 from ..util import get_end_of_line_character
 from ..util import get_query_string
 
@@ -11,24 +12,94 @@ except ImportError:
     from urllib import quote
 
 
-def encode_form(body_lines):
-    # return the form-urlencoded version of the body.
+def encode_form(body_lines, eol):
+    """Return the form-urlencoded version of the body."""
+
+    # Field names as keys, and lists of field values as values.
     form = {}
+
+    # Key and value for multiple field. These are set only while in the
+    # process of consuming lines.
+    delimited_key = None
+    delimited_value = None
+
+    # Read delimiters from settings.
+    settings = sublime.load_settings(SETTINGS_FILE)
+    form_field_start = settings.get("form_field_start", None)
+    form_field_end = settings.get("form_field_end", None)
+    delimited = form_field_start and form_field_end
+
     for line in body_lines:
-        line = line.strip()
-        if "=" in line:
-            (key, value) = line.split("=", 1)
-        elif ":" in line:
-            (key, value) = line.split(":", 1)
+
+        key = None
+        value = None
+
+        # Currently building delimited field.
+        if delimited and delimited_key:
+
+            # Check if this line ends with the closing delimiter.
+            if line.rstrip().endswith(form_field_end):
+
+                # Read the line up to the delimiter.
+                value = line.rstrip()[:-len(form_field_end)]
+
+                # The field is complete. Prepare to copy this to the form.
+                key = delimited_key
+                value = delimited_value + eol + value
+                delimited_key = None
+                delimited_value = None
+
+            # The field is still being built. Append the current line.
+            else:
+                delimited_value += eol + line
+
+        # No delimited field in progress.
         else:
-            key, value = None, None
+
+            # Attempt to parse this line into a key-value pair.
+            if "=" in line:
+                (key, value) = line.split("=", 1)
+            elif ":" in line:
+                (key, value) = line.split(":", 1)
+
+            if key and value:
+
+                key = key.strip()
+
+                # Test if this value begins a delimited value.
+
+                # If the field begins with the starting delimiter, copy the
+                # contents after that delimiter to a variable.
+                if delimited and value.lstrip().startswith(form_field_start):
+                    value = value.lstrip()[len(form_field_start):]
+
+                    # If the field ends with the ending delimiter, trim the
+                    # delimiter from the end and close field.
+                    if value.rstrip().endswith(form_field_end):
+                        value = value.rstrip()[:-len(form_field_end)]
+                        delimited_key = None
+                        delimited_value = None
+
+                    # If the field does NOT end with the delimiter, keep
+                    # building the field with subsequent lines.
+                    else:
+                        delimited_key = key
+                        delimited_value = value
+                        key = None
+                        value = None
+
+                # Normal field.
+                else:
+                    value = value.strip()
+
+        # As long as key and value are set, add the item to the form
         if key and value:
-            key = key.strip()
-            value = quote(value.strip())
+            value = quote(value)
             if key in form:
                 form[key].append(value)
             else:
                 form[key] = [value]
+
     return get_query_string(form)
 
 
@@ -38,7 +109,7 @@ def has_form_encoded_header(header_lines):
         if ":" in line:
             (header, value) = line.split(":", 1)
             if header.lower() == "content-type" \
-                and "x-www-form-urlencoded" in value:
+                    and "x-www-form-urlencoded" in value:
                 return True
     return False
 
@@ -76,6 +147,6 @@ class AutoFormEncodeCommand(sublime_plugin.TextCommand):
 
         (headers, body) = text.split(eol * 2, 1)
         if has_form_encoded_header(headers.split(eol)):
-            encoded_body = encode_form(body.split(eol))
+            encoded_body = encode_form(body.split(eol), eol)
             request = headers + eol + eol + encoded_body
             self.view.replace(self._edit, selection, request)

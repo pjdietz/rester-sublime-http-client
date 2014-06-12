@@ -1,0 +1,27 @@
+RESTer 1.6.0 Change Log
+
+
+New Features:
+
+- Multiline Form Field Values
+
+    The support for automatically encoding a request body as a form now allows
+    for multiline field values and values with whitespace preserved intact.
+
+    To use this feature, wrap the value in delimiters. By default, the values
+    will look like Python-style """triple-quotes strings""", but you can
+    customize this by changing the form_field_start and form_field_end
+    values in the settings file.
+
+    Here's a sample request using the default delimiters:
+
+        POST http://api.my-example-site.com/cats/
+        Content-type: application/x-www-form-urlencoded
+
+        name: Molly
+        color: Calico
+        nickname: Mrs. Puff
+        extra: """{
+            "id": 2,
+            "description": "This JSON snippet is wrapped in delimiters because it has multiple lines."
+        }"""

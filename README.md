@@ -166,6 +166,27 @@ Content-type: application/x-www-form-urlencoded
   nickname: Mrs. Puff
 ```
 
+##### Multiline Values
+
+Use delimiters to mark the boundaries of multiline field values. By default, the delimiters are `"""` to mimic a triple-quoted Python string. You may customize this by providing values for the `form_field_start` and `form_field_end` settings.
+
+Here's an example of a request using mixed single- and multiline fields.
+
+```
+POST http://api.my-example-site.com/cats/
+Content-type: application/x-www-form-urlencoded
+
+name: Molly
+color: Calico
+nickname: Mrs. Puff
+extra: """{
+    "id": 2,
+    "description": "This JSON snippet is wrapped in delimiters because it has multiple lines."
+}"""
+
+```
+
+
 ### Comments
 
 You may include comments in your request by adding lines in the headers section that begin with `#`. RESTer will ignore these lines.
