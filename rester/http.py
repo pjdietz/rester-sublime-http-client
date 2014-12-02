@@ -104,7 +104,7 @@ class HttpRequestThread(threading.Thread):
         content_encoding = self.response.get_header("content-encoding")
         if content_encoding:
             content_encoding = content_encoding.lower()
-            if "gzip" in content_encoding or "defalte" in content_encoding:
+            if "gzip" in content_encoding or "deflate" in content_encoding:
                 body_bytes = zlib.decompress(body_bytes, 15 + 32)
         return body_bytes
 
