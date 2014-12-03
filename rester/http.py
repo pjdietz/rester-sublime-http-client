@@ -2,9 +2,12 @@
 Modules for making HTTP requests using the built in Python http.client module
 """
 
+import codecs
 import json
+import os
 import socket
 import subprocess
+import tempfile
 import threading
 import time
 import zlib
@@ -224,6 +227,7 @@ class CurlRequestThread(HttpRequestThread):
         HttpRequestThread.__init__(self, request, settings, **kwargs)
         self._curl_command = settings.get("curl_command", "curl")
         self._curl_options = settings.get("curl_options", [])
+        self._request_body_file = None
 
     def run(self):
 
@@ -237,6 +241,11 @@ class CurlRequestThread(HttpRequestThread):
         time_end = time.time()
         self.elapsed = time_end - time_start
         returncode = curl.returncode
+
+        # Delete the temporary file for message body.
+        if self._request_body_file:
+            os.remove(self._request_body_file)
+
         if returncode != 0:
             self._read_curl_error(returncode)
             self.success = False
@@ -277,8 +286,21 @@ class CurlRequestThread(HttpRequestThread):
         # Body
         if self.request.method in ("POST", "PUT", "PATCH") and \
                 self.request.body:
+
+            # Open a temporary file to write the request body to.
+            # (Note: Using codecs to support Python 2.6)
+            tmpfile = tempfile.NamedTemporaryFile("w", delete=False)
+            filename = tmpfile.name
+            tmpfile.close()
+            tmpfile = codecs.open(filename, "w", encoding="UTF8")
+            tmpfile.write(self.request.body)
+            tmpfile.close()
+
             args.append("--data-binary")
-            args.append(self.request.body)
+            args.append("@" + filename)
+
+            # Store the temporary file's filename for later deletion.
+            self._request_body_file = filename
 
         args += self._curl_options
 
