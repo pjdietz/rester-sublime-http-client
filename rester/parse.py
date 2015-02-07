@@ -43,8 +43,12 @@ class RequestParser:
 
         # Set defaults from settings.
         default_headers = self.settings.get("default_headers", {})
-        for header in default_headers:
-            self.request.headers[header] = default_headers[header]
+        if isinstance(default_headers, dict):
+            for header in default_headers:
+                self.request.headers.append((header, default_headers[header]))
+        elif default_headers:
+            for header in default_headers:
+                self.request.headers.append(header)
 
         self.request.port = self.settings.get("port", None)
         self.request.protocol = self.settings.get("protocol", None)
@@ -114,9 +118,9 @@ class RequestParser:
     def _parse_header_lines(self, header_lines):
 
         # Parse the lines before the body.
-        # Build request's headers dictionary
+        # Build request headers list.
 
-        headers = {}
+        headers = []
 
         for header in header_lines:
             header = header.lstrip()
@@ -146,14 +150,10 @@ class RequestParser:
             # All else are headers
             elif ":" in header:
                 (key, value) = header.split(":", 1)
-                headers[key] = value.strip()
+                headers.append((key, value.strip()))
 
         # Merge headers with default headers provided in settings.
-        if headers and self.request.headers:
-            self.request.headers = dict(list(self.request.headers.items()) +
-                                        list(headers.items()))
-        elif headers:
-            self.request.headers = headers
+        self.request.headers.extend(headers)
 
     def _parse_request_line(self, line):
 

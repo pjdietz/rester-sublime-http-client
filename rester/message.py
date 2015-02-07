@@ -5,26 +5,26 @@ class Message(object):
     """Base class for HTTP messages"""
 
     def __init__(self):
-        self.headers = {}
+        self.headers = []
         self.body = ""
 
     @property
     def header_lines(self):
         lines = []
-        for key in self.headers:
-            lines.append("%s: %s" % (key, self.headers[key]))
+        for key, value in self.headers:
+            lines.append("%s: %s" % (key, value))
         return lines
 
     def get_header(self, header):
         header = header.lower()
-        for key in self.headers:
+        for key, value in self.headers:
             if key.lower() == header:
-                return self.headers[key]
+                return value
         return None
 
 
 class Request(Message):
-    """Represents an HTTP requst"""
+    """Represents an HTTP request"""
 
     def __init__(self):
         Message.__init__(self)
@@ -42,7 +42,9 @@ class Request(Message):
     @host.setter
     def host(self, host):
         self._host = host
-        self.headers["Host"] = host
+        # Add a host header, only if none exists.
+        if not self.get_header("host"):
+            self.headers.append(("Host", host))
 
     @property
     def full_path(self):

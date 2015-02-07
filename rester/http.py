@@ -156,14 +156,22 @@ class HttpClientRequestThread(HttpRequestThread):
                                 port=self.request.port,
                                 timeout=self._timeout)
 
-        # Convert the body to bytes
-        body_bytes = None
-        if self.request.body:
-            body_bytes = self.request.body.encode(self._encoding)
-
         try:
-            conn.request(self.request.method, self.request.full_path,
-                         headers=self.request.headers, body=body_bytes)
+            # Body
+            body_bytes = None
+            if self.request.body:
+                body_bytes = self.request.body.encode(self._encoding)
+                if not self.request.get_header("Content-length"):
+                    self.request.headers.append(("Content-length", len(body_bytes)))
+            # Method and Path
+            conn.putrequest(self.request.method, self.request.full_path, True, True)
+            # Headers
+            for key, value in self.request.headers:
+                conn.putheader(key, value)
+            conn.endheaders()
+            # Body
+            if body_bytes:
+                conn.send(body_bytes)
 
         except socket.gaierror:
             self.message = "Unable to make request. " \
@@ -215,8 +223,7 @@ class HttpClientRequestThread(HttpRequestThread):
         self.response.reason = resp.reason
 
         # Headers
-        for (key, value) in resp.getheaders():
-            self.response.headers[key] = value
+        self.response.headers = resp.getheaders()
 
         # Body
         self.response.body = self._read_body(resp.read())
@@ -320,7 +327,7 @@ class CurlRequestThread(HttpRequestThread):
         size_header = meta["size_header"]
         size_download = meta["size_download"]
 
-        # Etract the headers and body
+        # Extract the headers and body
         headers = curl_output[0:size_header]
         body = curl_output[size_header:size_header + size_download]
 
@@ -342,7 +349,7 @@ class CurlRequestThread(HttpRequestThread):
         except ValueError:
             print(curl_output)
             self.message = "Unable to read response. " \
-                           "Reponse may have times out."
+                           "Response may have times out."
             self.success = False
             return
 
@@ -350,11 +357,11 @@ class CurlRequestThread(HttpRequestThread):
         self.response.status = int(status)
         self.response.reason = reason
 
-        # Add eeach header
+        # Add each header
         for header in headers[1:]:
             if ":" in header:
                 (key, value) = header.split(":", 1)
-                self.response.headers[key.strip()] = value.strip()
+                self.response.headers.append((key.strip(), value.strip()))
 
         # Read the body
         self.response.body = self._read_body(body)

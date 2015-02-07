@@ -37,7 +37,7 @@ def _normalize_command(command):
 
     valid = False
 
-    # Find the stirng class. (str for py3, basestring for py2)
+    # Find the string class. (str for py3, basestring for py2)
     string_class = str
     try:
         # If Python 2, use basestring instead of str
