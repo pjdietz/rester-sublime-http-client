@@ -28,23 +28,12 @@ class Request(Message):
 
     def __init__(self):
         Message.__init__(self)
-        self._host = None
+        self.host = None
         self.protocol = "http"
         self.method = "GET"
         self.path = "/"
         self.port = None
         self.query = {}
-
-    @property
-    def host(self):
-        return self._host
-
-    @host.setter
-    def host(self, host):
-        self._host = host
-        # Add a host header, only if none exists.
-        if not self.get_header("host"):
-            self.headers.append(("Host", host))
 
     @property
     def full_path(self):
@@ -62,7 +51,7 @@ class Request(Message):
     @property
     def uri(self):
         """Full URI, including protocol"""
-        uri = self.protocol + "://" + self._host
+        uri = self.protocol + "://" + self.host
         if self.port:
             uri += ":" + str(self.port)
         uri += self.full_path

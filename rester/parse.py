@@ -50,6 +50,7 @@ class RequestParser:
             for header in default_headers:
                 self.request.headers.append(header)
 
+        self.request.host = self.settings.get("host", None)
         self.request.port = self.settings.get("port", None)
         self.request.protocol = self.settings.get("protocol", None)
 

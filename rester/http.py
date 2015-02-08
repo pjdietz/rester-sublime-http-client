@@ -157,18 +157,26 @@ class HttpClientRequestThread(HttpRequestThread):
                                 timeout=self._timeout)
 
         try:
-            # Body
+
+            # Body: encode and add Content-length header
             body_bytes = None
             if self.request.body:
                 body_bytes = self.request.body.encode(self._encoding)
                 if not self.request.get_header("Content-length"):
                     self.request.headers.append(("Content-length", len(body_bytes)))
+
+            # Insert a host header, if needed.
+            if not self.request.get_header("host"):
+               self.request.headers.append(("Host", self.request.host))
+
             # Method and Path
             conn.putrequest(self.request.method, self.request.full_path, True, True)
+
             # Headers
             for key, value in self.request.headers:
                 conn.putheader(key, value)
             conn.endheaders()
+
             # Body
             if body_bytes:
                 conn.send(body_bytes)
