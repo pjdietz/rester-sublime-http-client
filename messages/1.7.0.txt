@@ -1,0 +1,19 @@
+RESTer 1.7.0 Change Log
+
+
+New Features:
+
+- Host Setting
+
+    The @host setting allows communicating with a different host or IP address
+    than in in the Host header or request line.
+
+    Example:
+
+        GET /my-endpoint
+        Host: api.my-example-site.com
+        @host: 127.0.0.1
+
+- Multiple Headers
+
+    Support added for multiple headers with the same name, such as Set-Cookies

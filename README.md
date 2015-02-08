@@ -264,9 +264,26 @@ Host: api.my-secure-example-site.com
 
 **Note for Linux Users:** The Python interpreter in Sublime Text on Linux does not have SSL support. To make HTTPS requests, you will need to change the RESTer settings to use [cURL](#curl).
 
+### Host
+
+RESTer will open the connection to the host it finds in the Host header or in the request line. Hoever, you may want to communicate with a server at a specfic IP address. Do do this, use the `@host` setting.
+
+```
+GET /my-endpoint
+Host: api.my-example-site.com
+@host: 127.0.0.1
+```
+
 ### Port
 
-RESTer will assume ports 80 and 443 for HTTP and HTTPS respectively. If you ofter require a specific custom port, you can set it in the settings.
+RESTer will assume ports 80 and 443 for HTTP and HTTPS respectively. If you ofter require a specific custom port, you can set it with the `@port` setting.
+
+```
+GET /my-endpoint
+Host: api.my-example-site.com
+@host: 127.0.0.1
+@port: 8888
+```
 
 ### Default Headers
 
