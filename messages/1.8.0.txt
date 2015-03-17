@@ -1,0 +1,21 @@
+RESTer 1.8.0 Change Log
+
+
+New Feature:
+
+- set_syntax Command
+
+    Use the new "set_syntax" command to set the syntax highlighting on new responses.
+
+    Example:
+
+        {
+            "response_commands": [
+                {
+                    "name": "set_syntax",
+                    "args": {
+                        "syntax_file": "Packages/HTTP Spec Syntax/httpspec.tmLanguage"
+                    }
+                }
+            ]
+        }

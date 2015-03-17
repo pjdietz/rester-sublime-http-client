@@ -17,6 +17,7 @@ Or, you can send headers and a body:
 ```
 PUT /my-endpoint HTTP/1.1
 Host: api.my-example-site.com
+
 Accept: text/plain
 Accept-Charset: utf-8
 X-custom-header: whatever you want
@@ -328,6 +329,34 @@ If you're not sure what the command is for a given feature, you may be able to r
 >>> view.command_history(0)
 ('insert', {'characters': '\n\n'}, 1)
 ```
+
+#### Response Syntax
+
+Start by finding the name of the syntax file. To view the current syntax, use the Python console:
+
+```python
+>>> view.settings().get("syntax")
+'Packages/HTTP Spec Syntax/httpspec.tmLanguage'
+```
+
+Use the bundled `set_syntax` command to set the syntax of any new resposes to the syntax file you chose. Here we are using "Packages/HTTP Spec Syntax/httpspec.tmLanguage", a syntax for HTTP messages that is part of the [httpspec/sublime-highlighting](https://github.com/httpspec/sublime-highlighting) package.
+
+```json
+{
+    "response_commands": [
+        {
+            "name": "set_syntax",
+            "args": {
+                "syntax_file": "Packages/HTTP Spec Syntax/httpspec.tmLanguage"
+            }
+        }
+    ]
+}
+```
+
+Notice that this command requires a `syntax_file` parameter. See [Request and Response Commands with Parameters](#request-and-response-commands-with-parameters) below to learn more about running commands with parameters.
+
+
 
 ### Request Commands
 
