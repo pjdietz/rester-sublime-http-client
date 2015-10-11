@@ -14,19 +14,24 @@ except ImportError:
     from urlparse import parse_qs
     from urllib import quote
 
-RE_METHOD = """(?P<method>[A-Z]+)"""
-RE_URI = """(?P<uri>[a-zA-Z0-9\-\/\.\_\:\?\#\[\]\@\!\$\&\=]+)"""
-
 
 def _read_request_line_dict(line):
-    # Return a dicionary containing information about the request.
-    m = re.search(RE_METHOD + "\s+" + RE_URI, line)
-    if m:
-        return m.groupdict()
-    m = re.search(RE_URI, line)
-    if m:
-        return m.groupdict()
-    return None
+    """Return a dict containing the method and uri for a request line"""
+
+    # Split the line into words.
+    words = line.split(" ")
+    method = "GET"
+    # If the line contains only one word, assume the line is the URI.
+    if len(words) == 1:
+        uri = words[0]
+    else:
+        method = words[0]
+        uri = words[1]
+
+    return {
+        "method": method,
+        "uri": uri
+    }
 
 
 class RequestParser:
