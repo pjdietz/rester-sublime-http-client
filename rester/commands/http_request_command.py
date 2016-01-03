@@ -102,6 +102,9 @@ class ResterHttpRequestCommand(sublime_plugin.WindowCommand):
         if not self.encoding or self.encoding == "Undefined":
             self.encoding = "UTF-8"
 
+        # Store the text before any request commands are applied.
+        originalText = self._get_selection()
+
         # Perform commands on the request buffer.
         # Store the number of changes made so we can undo them.
         try:
@@ -120,8 +123,9 @@ class ResterHttpRequestCommand(sublime_plugin.WindowCommand):
         text = self._get_selection()
 
         # Undo the request commands to return to the starting state.
-        for i in range(changes):
-            self.request_view.run_command("undo")
+        if text != originalText:
+            for i in range(changes):
+                self.request_view.run_command("undo")
 
         # Build a message.Request from the text.
         request_parser = RequestParser(self.settings, self.eol)

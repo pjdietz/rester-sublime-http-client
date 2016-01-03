@@ -1,0 +1,6 @@
+RESTer 1.8.2 Change Log
+
+Bug fix:
+
+Fixed an issue in Sublime Text 2 where RESTer would undo the last change to the
+request buffer even when no request commands caused changes.
