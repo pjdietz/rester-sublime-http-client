@@ -114,7 +114,7 @@ One thing to note is that RESTer assumes that anything you place directly in the
 These requests are equivalent:
 
 ```
-http://api.my-example-site.com/?item=I520like%20spaces
+http://api.my-example-site.com/?item=I%20like%20spaces
 ```
 
 ```
