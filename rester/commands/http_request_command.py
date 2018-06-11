@@ -493,3 +493,26 @@ class ResterHttpRequestCommand(sublime_plugin.WindowCommand):
         thread = thread_class(request, self.settings, encoding=self.encoding)
         thread.start()
         self.handle_thread(thread)
+
+
+class ResterHttpResponseCloseEvent(sublime_plugin.ViewEventListener):
+    @classmethod
+    def is_applicable(cls, settings):
+        syntax = settings.get('syntax')
+        return syntax == SYNTAX_FILE
+
+    @classmethod
+    def applies_to_primary_view_only(cls):
+        return True
+
+    def on_pre_close(self):
+        settings = sublime.load_settings(SETTINGS_FILE)
+        response_group = settings.get("response_group", None)
+        if response_group is not None:
+            response_group = min(response_group, MAX_GROUPS)
+            window = self.view.window()
+            views = window.views_in_group(response_group)
+            if len(views) == 1 and self.view == views[0]:
+                window.focus_group(0)
+                fn = lambda: window.run_command("close_pane")
+                sublime.set_timeout(fn, 0)
