@@ -127,6 +127,22 @@ class ResterHttpRequestCommand(sublime_plugin.WindowCommand):
             for i in range(changes):
                 self.request_view.run_command("undo")
 
+        def replace(m):
+            return variables.get(m.group(1), '')
+        view = self.request_view
+        extractions = []
+        view.find_all(r'(?:(#)\s*)?@([_a-zA-Z][_a-zA-Z0-9]*)\s*=\s*(.*)', 0, r'\1\2=\3', extractions)
+        variables = {}
+        for var in extractions:
+            var, _, val = var.partition('=')
+            if var[0] != '#':
+                variables[var] = val.strip()
+        for var in re.findall(r'(?:(#)\s*)?@([_a-zA-Z][_a-zA-Z0-9]*)\s*=\s*(.*)', originalText):
+            if var[0] != '#':
+                var, val = var[1], var[2]
+                variables[var] = val.strip()
+        text = re.sub(r'\{\{\s*([_a-zA-Z][_a-zA-Z0-9]*)\s*\}\}', replace, text)
+
         # Build a message.Request from the text.
         request_parser = RequestParser(self.settings, self.eol)
         request = request_parser.get_request(text)
