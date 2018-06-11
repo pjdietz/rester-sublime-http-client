@@ -350,6 +350,14 @@ class ResterHttpRequestCommand(sublime_plugin.WindowCommand):
         sels = view.sel()
         if len(sels) == 1 and sels[0].empty():
             selection = view.substr(sublime.Region(0, view.size()))
+            begin = selection.rfind('\n###', 0, sels[0].a)
+            end = selection.find('\n###', sels[0].a)
+            if begin and end:
+                selection = selection[begin:end]
+            elif begin:
+                selection = selection[begin:]
+            elif end:
+                selection = selection[:end]
         else:
             selection = ""
             for sel in sels:
