@@ -331,32 +331,24 @@ class ResterHttpRequestCommand(sublime_plugin.WindowCommand):
         tmpfile.close()
         filepath = tmpfile.name
 
-        # Focus (create, if needed) a group specific for responses.
-        response_group = self.settings.get("response_group", None)
-        if not response_group is None:
-
-            response_group = min(response_group, MAX_GROUPS)
-            created_new_group = False
-            while self.window.num_groups() < response_group + 1:
-                self.window.run_command("new_pane")
-                created_new_group = True
-
-            # When Sublime creates a new group, it moves the current view to
-            # it. Return the request view to the original group and index.
-            if created_new_group:
-                self.window.set_view_index(self.request_view,
-                                           self._request_view_group,
-                                           self._request_view_index)
-
-            # Set the focus to the response group.
-            self.window.focus_group(response_group)
-
         # Open the file in a new view.
         title = status_line
         if thread.elapsed:
             title += " (%.4f sec.)" % thread.elapsed
-        self.response_view = self.window.open_file(filepath, sublime.TRANSIENT)
+        self.response_view = self.window.open_file(filepath)
         self.response_view.set_syntax_file('Packages/RESTer HTTP Client/http.tmLanguage')
+
+        # Create, if needed, a group specific for responses and move the
+        # response view to that group.
+        response_group = self.settings.get("response_group", None)
+        if response_group is not None:
+            response_group = min(response_group, MAX_GROUPS)
+            while self.window.num_groups() < response_group + 1:
+                self.window.run_command("new_pane")
+            self.window.set_view_index(self.response_view, response_group, 0)
+            if not self.settings.get("request_focus", False):
+                # Set the focus to the response group.
+                self.window.focus_group(response_group)
         self.handle_response_view(tmpfile.name, title, body_only)
 
     def _get_selection(self, pos=None):
