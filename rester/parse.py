@@ -47,13 +47,20 @@ class RequestParser:
         self.request = Request()
 
         # Set defaults from settings.
+        default_host_header = None
         default_headers = self.settings.get("default_headers", {})
         if isinstance(default_headers, dict):
             for header in default_headers:
-                self.request.headers.append((header, default_headers[header]))
+                if header.lower() == 'host':
+                    default_host_header = default_headers[header]
+                else:
+                    self.request.headers.append((header, default_headers[header]))
         elif default_headers:
             for header in default_headers:
-                self.request.headers.append(header)
+                if header[0].lower() == 'host':
+                    default_host_header = header[1]
+                else:
+                    self.request.headers.append(header)
 
         self.request.host = self.settings.get("host", None)
         self.request.port = self.settings.get("port", None)
@@ -100,6 +107,9 @@ class RequestParser:
             host = self.request.get_header("host")
             if host:
                 self.request.host = host
+
+        if not self.request.host and default_host_header:
+            self.request.host = default_host_header
 
         # If there is still no hostname, but there is a path, try re-parsing
         # the path with // prepended.
