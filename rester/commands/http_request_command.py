@@ -476,6 +476,7 @@ class ResterHttpRequestCommand(sublime_plugin.WindowCommand):
         if self.settings.get("output_request", True):
             print("\n[Request]")
             print(request.request_line)
+            print("Host: %s" % request.host)
             for header in request.header_lines:
                 print(header)
             if request.body:
