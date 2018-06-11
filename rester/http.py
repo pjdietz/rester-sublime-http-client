@@ -11,6 +11,7 @@ import tempfile
 import threading
 import time
 import zlib
+import errno
 
 from .message import Response
 from .util import normalize_line_endings
@@ -188,7 +189,9 @@ class HttpClientRequestThread(HttpRequestThread):
             conn.close()
             return
 
-        except ConnectionRefusedError:
+        except OSError as e:
+            if e.errno != errno.ECONNREFUSED:
+                raise
             self.message = "Connection refused."
             self.success = False
             conn.close()
