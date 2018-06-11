@@ -198,7 +198,7 @@ class HttpClientRequestThread(HttpRequestThread):
             return
 
         # Read the response.
-        #noinspection PyBroadException
+        # noinspection PyBroadException
         try:
             time_start = time.time()
             resp = conn.getresponse()
@@ -207,7 +207,7 @@ class HttpClientRequestThread(HttpRequestThread):
             self.success = False
             conn.close()
             return
-        except:
+        except Exception:
             self.message = "Unexpected error making request."
             self.success = False
             conn.close()
