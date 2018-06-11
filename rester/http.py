@@ -168,7 +168,7 @@ class HttpClientRequestThread(HttpRequestThread):
 
             # Insert a host header, if needed.
             if not self.request.get_header("host"):
-               self.request.headers.append(("Host", self.request.host))
+                self.request.headers.append(("Host", self.request.host))
 
             # Method and Path
             conn.putrequest(self.request.method, self.request.full_path, True, True)
