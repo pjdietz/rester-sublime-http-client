@@ -83,8 +83,7 @@ class ResterHttpRequestCommand(sublime_plugin.WindowCommand):
         self._request_view_group = None
         self._request_view_index = None
 
-    def run(self):
-
+    def run(self, pos=None):
         # Store references.
         self.request_view = self.window.active_view()
         self._request_view_group, self._request_view_index = \
@@ -103,7 +102,7 @@ class ResterHttpRequestCommand(sublime_plugin.WindowCommand):
             self.encoding = "UTF-8"
 
         # Store the text before any request commands are applied.
-        originalText = self._get_selection()
+        originalText = self._get_selection(pos)
 
         # Perform commands on the request buffer.
         # Store the number of changes made so we can undo them.
@@ -120,7 +119,7 @@ class ResterHttpRequestCommand(sublime_plugin.WindowCommand):
             changes = 1
 
         # Read the selected text.
-        text = self._get_selection()
+        text = self._get_selection(pos)
 
         # Undo the request commands to return to the starting state.
         if text != originalText:
@@ -360,15 +359,18 @@ class ResterHttpRequestCommand(sublime_plugin.WindowCommand):
         self.response_view.set_syntax_file('Packages/RESTer HTTP Client/http.tmLanguage')
         self.handle_response_view(tmpfile.name, title, body_only)
 
-    def _get_selection(self):
+    def _get_selection(self, pos=None):
         # Return a string of the selected text or the entire buffer.
         # if there are multiple selections, concatenate them.
         view = self.request_view
-        sels = view.sel()
-        if len(sels) == 1 and sels[0].empty():
+        if pos is None:
+            sels = view.sel()
+            if len(sels) == 1 and sels[0].empty():
+                pos = sels[0].a
+        if pos is not None:
             selection = view.substr(sublime.Region(0, view.size()))
-            begin = selection.rfind('\n###', 0, sels[0].a)
-            end = selection.find('\n###', sels[0].a)
+            begin = selection.rfind('\n###', 0, pos)
+            end = selection.find('\n###', pos)
             if begin and end:
                 selection = selection[begin:end]
             elif begin:
