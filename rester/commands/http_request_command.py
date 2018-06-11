@@ -6,7 +6,7 @@ import re
 import tempfile
 import time
 
-from ..constants import SETTINGS_FILE
+from ..constants import SETTINGS_FILE, SYNTAX_FILE
 from ..http import CurlRequestThread
 from ..http import HttpClientRequestThread
 from ..message import Request
@@ -336,7 +336,7 @@ class ResterHttpRequestCommand(sublime_plugin.WindowCommand):
         if thread.elapsed:
             title += " (%.4f sec.)" % thread.elapsed
         self.response_view = self.window.open_file(filepath)
-        self.response_view.set_syntax_file('Packages/RESTer HTTP Client/http.tmLanguage')
+        self.response_view.set_syntax_file(SYNTAX_FILE)
 
         # Create, if needed, a group specific for responses and move the
         # response view to that group.

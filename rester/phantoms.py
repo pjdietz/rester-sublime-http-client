@@ -1,6 +1,8 @@
 import sublime
 import sublime_plugin
 
+from .constants import SYNTAX_FILE
+
 
 class RESTer(sublime_plugin.ViewEventListener):
     def __init__(self, view):
@@ -12,7 +14,7 @@ class RESTer(sublime_plugin.ViewEventListener):
     @classmethod
     def is_applicable(cls, settings):
         syntax = settings.get('syntax')
-        return syntax == 'Packages/RESTer HTTP Client/http.tmLanguage'
+        return syntax == SYNTAX_FILE
 
     def update_phantoms(self):
         phantoms = []
