@@ -357,6 +357,7 @@ class ResterHttpRequestCommand(sublime_plugin.WindowCommand):
         if thread.elapsed:
             title += " (%.4f sec.)" % thread.elapsed
         self.response_view = self.window.open_file(filepath, sublime.TRANSIENT)
+        self.response_view.set_syntax_file('Packages/RESTer HTTP Client/http.tmLanguage')
         self.handle_response_view(tmpfile.name, title, body_only)
 
     def _get_selection(self):
