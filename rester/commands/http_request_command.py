@@ -363,11 +363,11 @@ class ResterHttpRequestCommand(sublime_plugin.WindowCommand):
             selection = view.substr(sublime.Region(0, view.size()))
             begin = selection.rfind('\n###', 0, pos)
             end = selection.find('\n###', pos)
-            if begin and end:
+            if begin != -1 and end != -1:
                 selection = selection[begin:end]
-            elif begin:
+            elif begin != -1:
                 selection = selection[begin:]
-            elif end:
+            elif end != -1:
                 selection = selection[:end]
         else:
             selection = ""
