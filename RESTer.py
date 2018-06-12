@@ -54,6 +54,7 @@ try:
     # Python 3
     from .rester import reloader
     from .rester.commands import *
+    from .rester.phantoms import *
 except ValueError:
     # Python 2
     from rester import reloader

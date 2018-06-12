@@ -11,6 +11,7 @@ import tempfile
 import threading
 import time
 import zlib
+import errno
 
 from .message import Response
 from .util import normalize_line_endings
@@ -167,7 +168,7 @@ class HttpClientRequestThread(HttpRequestThread):
 
             # Insert a host header, if needed.
             if not self.request.get_header("host"):
-               self.request.headers.append(("Host", self.request.host))
+                self.request.headers.append(("Host", self.request.host))
 
             # Method and Path
             conn.putrequest(self.request.method, self.request.full_path, True, True)
@@ -188,14 +189,16 @@ class HttpClientRequestThread(HttpRequestThread):
             conn.close()
             return
 
-        except ConnectionRefusedError:
+        except OSError as e:
+            if e.errno != errno.ECONNREFUSED:
+                raise
             self.message = "Connection refused."
             self.success = False
             conn.close()
             return
 
         # Read the response.
-        #noinspection PyBroadException
+        # noinspection PyBroadException
         try:
             time_start = time.time()
             resp = conn.getresponse()
@@ -204,7 +207,7 @@ class HttpClientRequestThread(HttpRequestThread):
             self.success = False
             conn.close()
             return
-        except:
+        except Exception:
             self.message = "Unexpected error making request."
             self.success = False
             conn.close()

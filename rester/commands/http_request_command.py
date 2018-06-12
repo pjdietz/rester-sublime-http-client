@@ -6,7 +6,7 @@ import re
 import tempfile
 import time
 
-from ..constants import SETTINGS_FILE
+from ..constants import SETTINGS_FILE, SYNTAX_FILE
 from ..http import CurlRequestThread
 from ..http import HttpClientRequestThread
 from ..message import Request
@@ -83,8 +83,7 @@ class ResterHttpRequestCommand(sublime_plugin.WindowCommand):
         self._request_view_group = None
         self._request_view_index = None
 
-    def run(self):
-
+    def run(self, pos=None):
         # Store references.
         self.request_view = self.window.active_view()
         self._request_view_group, self._request_view_index = \
@@ -103,7 +102,7 @@ class ResterHttpRequestCommand(sublime_plugin.WindowCommand):
             self.encoding = "UTF-8"
 
         # Store the text before any request commands are applied.
-        originalText = self._get_selection()
+        originalText = self._get_selection(pos)
 
         # Perform commands on the request buffer.
         # Store the number of changes made so we can undo them.
@@ -120,12 +119,28 @@ class ResterHttpRequestCommand(sublime_plugin.WindowCommand):
             changes = 1
 
         # Read the selected text.
-        text = self._get_selection()
+        text = self._get_selection(pos)
 
         # Undo the request commands to return to the starting state.
         if text != originalText:
             for i in range(changes):
                 self.request_view.run_command("undo")
+
+        def replace(m):
+            return variables.get(m.group(1), '')
+        view = self.request_view
+        extractions = []
+        view.find_all(r'(?:(#)\s*)?@([_a-zA-Z][_a-zA-Z0-9]*)\s*=\s*(.*)', 0, r'\1\2=\3', extractions)
+        variables = {}
+        for var in extractions:
+            var, _, val = var.partition('=')
+            if var[0] != '#':
+                variables[var] = val.strip()
+        for var in re.findall(r'(?:(#)\s*)?@([_a-zA-Z][_a-zA-Z0-9]*)\s*=\s*(.*)', originalText):
+            if var[0] != '#':
+                var, val = var[1], var[2]
+                variables[var] = val.strip()
+        text = re.sub(r'\{\{\s*([_a-zA-Z][_a-zA-Z0-9]*)\s*\}\}', replace, text)
 
         # Build a message.Request from the text.
         request_parser = RequestParser(self.settings, self.eol)
@@ -316,40 +331,44 @@ class ResterHttpRequestCommand(sublime_plugin.WindowCommand):
         tmpfile.close()
         filepath = tmpfile.name
 
-        # Focus (create, if needed) a group specific for responses.
-        response_group = self.settings.get("response_group", None)
-        if not response_group is None:
-
-            response_group = min(response_group, MAX_GROUPS)
-            created_new_group = False
-            while self.window.num_groups() < response_group + 1:
-                self.window.run_command("new_pane")
-                created_new_group = True
-
-            # When Sublime creates a new group, it moves the current view to
-            # it. Return the request view to the original group and index.
-            if created_new_group:
-                self.window.set_view_index(self.request_view,
-                                           self._request_view_group,
-                                           self._request_view_index)
-
-            # Set the focus to the response group.
-            self.window.focus_group(response_group)
-
         # Open the file in a new view.
         title = status_line
         if thread.elapsed:
             title += " (%.4f sec.)" % thread.elapsed
-        self.response_view = self.window.open_file(filepath, sublime.TRANSIENT)
+        self.response_view = self.window.open_file(filepath)
+        self.response_view.set_syntax_file(SYNTAX_FILE)
+
+        # Create, if needed, a group specific for responses and move the
+        # response view to that group.
+        response_group = self.settings.get("response_group", None)
+        if response_group is not None:
+            response_group = min(response_group, MAX_GROUPS)
+            while self.window.num_groups() < response_group + 1:
+                self.window.run_command("new_pane")
+            self.window.set_view_index(self.response_view, response_group, 0)
+            if not self.settings.get("request_focus", False):
+                # Set the focus to the response group.
+                self.window.focus_group(response_group)
         self.handle_response_view(tmpfile.name, title, body_only)
 
-    def _get_selection(self):
+    def _get_selection(self, pos=None):
         # Return a string of the selected text or the entire buffer.
         # if there are multiple selections, concatenate them.
         view = self.request_view
-        sels = view.sel()
-        if len(sels) == 1 and sels[0].empty():
+        if pos is None:
+            sels = view.sel()
+            if len(sels) == 1 and sels[0].empty():
+                pos = sels[0].a
+        if pos is not None:
             selection = view.substr(sublime.Region(0, view.size()))
+            begin = selection.rfind('\n###', 0, pos)
+            end = selection.find('\n###', pos)
+            if begin != -1 and end != -1:
+                selection = selection[begin:end]
+            elif begin != -1:
+                selection = selection[begin:]
+            elif end != -1:
+                selection = selection[:end]
         else:
             selection = ""
             for sel in sels:
@@ -449,6 +468,7 @@ class ResterHttpRequestCommand(sublime_plugin.WindowCommand):
         if self.settings.get("output_request", True):
             print("\n[Request]")
             print(request.request_line)
+            print("Host: %s" % request.host)
             for header in request.header_lines:
                 print(header)
             if request.body:
@@ -473,3 +493,26 @@ class ResterHttpRequestCommand(sublime_plugin.WindowCommand):
         thread = thread_class(request, self.settings, encoding=self.encoding)
         thread.start()
         self.handle_thread(thread)
+
+
+class ResterHttpResponseCloseEvent(sublime_plugin.ViewEventListener):
+    @classmethod
+    def is_applicable(cls, settings):
+        syntax = settings.get('syntax')
+        return syntax == SYNTAX_FILE
+
+    @classmethod
+    def applies_to_primary_view_only(cls):
+        return True
+
+    def on_pre_close(self):
+        settings = sublime.load_settings(SETTINGS_FILE)
+        response_group = settings.get("response_group", None)
+        if response_group is not None:
+            response_group = min(response_group, MAX_GROUPS)
+            window = self.view.window()
+            views = window.views_in_group(response_group)
+            if len(views) == 1 and self.view == views[0]:
+                window.focus_group(0)
+                fn = lambda: window.run_command("close_pane")
+                sublime.set_timeout(fn, 0)
